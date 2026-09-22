@@ -8,7 +8,7 @@ enum SessionStatus { idle, running, paused, completed, failed }
 /// to this to update the clock, and reacts to completed/failed to
 /// grow or wilt the plant.
 class SessionModel extends ChangeNotifier {
-  static const int sessionLengthSeconds = 10; // 25:00, matches the Figma
+  static const int sessionLengthSeconds = 25 * 60; // 25:00, matches the Figma
 
   int secondsLeft = sessionLengthSeconds;
   SessionStatus status = SessionStatus.idle;
