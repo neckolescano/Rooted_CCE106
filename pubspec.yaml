@@ -1,0 +1,31 @@
+name: rooted
+description: "Rooted — a Pomodoro study app with a plant that grows or wilts with you."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2       # simple state management (ChangeNotifier)
+  shared_preferences: ^2.2.3  # local storage for streak / sessions / plant progress
+  google_fonts: ^6.2.1   # for the pixel-style heading font
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Flutter only includes files directly inside a listed folder (not
+  # subfolders), so both of these need to be listed separately.
+  assets:
+    - assets/images/plant/stages/
+    - assets/images/plant/frames/
+    - assets/images/backgrounds/
+    - assets/images/buttons/
+    - assets/images/popups/
