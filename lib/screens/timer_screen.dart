@@ -10,6 +10,7 @@ import '../widgets/harvest_celebration_dialog.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/plant_display.dart';
+import 'notes_screen.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -163,13 +164,44 @@ class _TimerScreenState extends State<TimerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.panelDark.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text('SESSION EN ROUTE', style: AppTheme.body(size: 13, color: AppColors.textCream, weight: FontWeight.bold)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.panelDark.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('SESSION EN ROUTE', style: AppTheme.body(size: 13, color: AppColors.textCream, weight: FontWeight.bold)),
+                    ),
+                    // Opens the Notes page. This just pushes on top of
+                    // the existing route — SessionModel isn't touched,
+                    // so the countdown keeps running underneath exactly
+                    // as it was, and this screen's own state (like
+                    // _isGrowing) is preserved too since it's never
+                    // disposed, just paused off-screen.
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotesScreen()),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.panelDark.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.edit_note, size: 16, color: AppColors.accentGold),
+                            const SizedBox(width: 4),
+                            Text('NOTES', style: AppTheme.body(size: 12, color: AppColors.accentGold, weight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 PixelPanel(

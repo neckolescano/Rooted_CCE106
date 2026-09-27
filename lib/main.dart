@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'models/notes_model.dart';
 import 'models/plant_model.dart';
 import 'models/session_model.dart';
 import 'services/storage_service.dart';
@@ -16,14 +17,18 @@ Future<void> main() async {
   final plant = PlantModel()
     ..loadFrom(stageIndex: storage.savedPlantStage, wilted: storage.savedPlantWilted);
 
-  runApp(RootedApp(storage: storage, plant: plant));
+  // Same idea for notes — whatever was last written is still there.
+  final notes = NotesModel()..loadFrom(storage.savedNotes);
+
+  runApp(RootedApp(storage: storage, plant: plant, notes: notes));
 }
 
 class RootedApp extends StatelessWidget {
-  const RootedApp({super.key, required this.storage, required this.plant});
+  const RootedApp({super.key, required this.storage, required this.plant, required this.notes});
 
   final StorageService storage;
   final PlantModel plant;
+  final NotesModel notes;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +38,9 @@ class RootedApp extends StatelessWidget {
         // not recreated every rebuild.
         Provider<StorageService>.value(value: storage),
         ChangeNotifierProvider<PlantModel>.value(value: plant),
+        // Lives at the root (like PlantModel) so Timer → Notes → Study
+        // Material → back never loses what was typed.
+        ChangeNotifierProvider<NotesModel>.value(value: notes),
         // A fresh SessionModel each time is fine — it only lives for the
         // duration of one Pomodoro session.
         ChangeNotifierProvider<SessionModel>(create: (_) => SessionModel()),

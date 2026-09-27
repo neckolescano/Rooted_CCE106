@@ -9,6 +9,7 @@ class _Keys {
   static const plantWilted = 'plant_wilted';
   static const username = 'username';
   static const harvestedPlants = 'harvested_plants';
+  static const notesText = 'notes_text';
 }
 
 /// A thin wrapper around SharedPreferences. Every screen that needs to
@@ -60,6 +61,15 @@ class StorageService {
   Future<void> savePlantState({required int stageIndex, required bool wilted}) async {
     await _prefs.setInt(_Keys.plantStage, stageIndex);
     await _prefs.setBool(_Keys.plantWilted, wilted);
+  }
+
+  // --- Study notes (tied to the current session, like everything else
+  // in this app — there's only one "slot" for now, same as the plant) ---
+
+  String get savedNotes => _prefs.getString(_Keys.notesText) ?? '';
+
+  Future<void> saveNotes(String text) async {
+    await _prefs.setString(_Keys.notesText, text);
   }
 
   // --- Profile ---

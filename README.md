@@ -116,7 +116,10 @@ flutter run
   `_sessionStarted` flag that only trusts a `"completed"` status once
   *this* screen has confirmed its own session actually started —
   closing the original race without reintroducing the crash
-- Harvest popup now uses your hand-drawn wooden scroll frame art
+- Harvest popup now uses your new hand-drawn wooden scroll frame art,
+  with a bigger plant, sparkle effects around it (pure code, no extra
+  art needed — see `lib/widgets/sparkle_overlay.dart`), and friendlier
+  copy
 - Plant art on Home, Timer, and in the harvest popup is bigger/more
   visible (was rendering smaller than it needed to)
 - **Fixed:** bottom nav overflowed by 3px on whichever tab was
@@ -148,5 +151,53 @@ flutter run
   Figma/Piskel popup art whenever it's ready; it only needs to keep
   returning `true` (start new session) / `false` (go home) from its two
   buttons for the logic underneath to keep working
-- No AI flashcard/notes feature yet — that's next once this batch feels
-  solid
+- **AI study material isn't connected to a real backend yet.** See
+  "Notes + AI Study Assistant" below — this is the one deliberate gap
+  left in an otherwise fully working feature
+
+## Notes + AI Study Assistant
+
+New this batch. From the Timer screen, tap the **NOTES** chip (top
+right, next to "SESSION EN ROUTE") to open a notes page:
+
+- **The Pomodoro countdown keeps running.** The Notes and Study
+  Material screens show a compact header (`CompactTimerHeader`) that
+  just *watches* the same `SessionModel` the Timer screen uses — there
+  is no second timer anywhere. Pausing from that compact header pauses
+  the real session, and going back to the Timer screen shows the same
+  countdown, uninterrupted.
+- **Notes persist** two ways: in `NotesModel` (a root-level provider,
+  like `PlantModel`) so navigating Timer → Notes → Study Material →
+  back never loses anything mid-session, AND saved to disk via
+  `StorageService.saveNotes()` so they're still there if the app is
+  closed and reopened.
+- **"✨ Generate Study Material"** is disabled in spirit — tapping it
+  with empty notes shows a message instead of calling anything, per
+  the spec.
+
+### The one gap: AI isn't wired to a real provider
+
+`lib/services/ai_service.dart` is intentionally **not** connected to
+an actual AI API. Calling an AI provider directly from the app would
+mean putting a secret API key inside the compiled app, where anyone
+could extract it — exactly what you asked NOT to do. Instead of
+faking that with a hardcoded key, `generateStudyMaterial()` throws a
+clear, honest error, which exercises the real error UI (message +
+Retry button) you asked for.
+
+Everything else is fully built and working end-to-end: the prompt
+text (`lib/services/study_material_prompt.dart`, matches your spec's
+prompt exactly), JSON parsing into `StudyMaterial`/`StudyQuestion`/
+`Flashcard` (`lib/models/study_material.dart`, tolerant of missing/
+malformed fields), the loading state, the error+Retry state, the
+Study Material page with Questions/Flashcards tabs, multiple-choice
+answer checking, flashcard flip/prev/next with a counter — all of it.
+
+**To connect it for real:** once you've decided how to host your AI
+API key (a small serverless function, your own backend, Firebase,
+etc. — never directly in the Flutter app), replace the body of
+`AiService.generateStudyMaterial()` with a real HTTP call to *your
+backend* (not directly to the AI provider), and parse its JSON
+response with `StudyMaterial.fromJson()`. Nothing else in the feature
+needs to change. Let me know what backend approach you want to use
+and I can wire that call in.

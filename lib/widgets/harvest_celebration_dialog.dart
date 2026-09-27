@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'pixel_button.dart';
+import 'sparkle_overlay.dart';
 
 /// Shown once a plant hits its final growth stage. Uses the hand-drawn
 /// wooden scroll/frame art — its "CONGRATULATIONS!" banner is already
 /// baked into the image, so this widget just places the fully-grown
-/// plant and a short message inside the open parchment area, then the
-/// two choice buttons below it.
+/// plant (with a little sparkle flourish) and a short message inside
+/// the open parchment area, then the two choice buttons below it.
 ///
 /// The two buttons are what actually matter to keep: they return `true`
 /// (start a new session right away) or `false` (just go back home) to
@@ -23,6 +24,15 @@ class HarvestCelebrationDialog extends StatelessWidget {
   // detail than will actually be visible on screen.
   static const double _frameWidth = 240;
   static const double _frameHeight = _frameWidth * 192 / 144;
+
+  // Measured directly from the art's parchment area (the tan region
+  // inside the wood border) as fractions of the full frame, so the
+  // plant/text land exactly inside it. If you redraw the frame, re-check
+  // these against the new parchment bounds.
+  static const double _paddingTop = 0.20;
+  static const double _paddingBottom = 0.16;
+  static const double _paddingLeft = 0.12;
+  static const double _paddingRight = 0.13;
 
   @override
   Widget build(BuildContext context) {
@@ -58,33 +68,43 @@ class HarvestCelebrationDialog extends StatelessWidget {
                     ),
                     // Sits in the open parchment area below the baked-in
                     // "CONGRATULATIONS!" banner and above the wooden
-                    // pegs at the bottom. Nudge these fractions if the
-                    // art changes and this stops lining up.
+                    // pegs at the bottom.
                     Padding(
                       padding: EdgeInsets.only(
-                        top: _frameHeight * 0.28,
-                        left: _frameWidth * 0.16,
-                        right: _frameWidth * 0.16,
-                        bottom: _frameHeight * 0.14,
+                        top: _frameHeight * _paddingTop,
+                        left: _frameWidth * _paddingLeft,
+                        right: _frameWidth * _paddingRight,
+                        bottom: _frameHeight * _paddingBottom,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Image.asset(
-                            _fullyGrownAsset,
-                            width: 88,
-                            height: 88,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.none,
-                            gaplessPlayback: true,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const SizedBox(width: 88, height: 88),
+                          SparkleOverlay(
+                            size: 130,
+                            child: Center(
+                              child: Image.asset(
+                                _fullyGrownAsset,
+                                width: 104,
+                                height: 104,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.none,
+                                gaplessPlayback: true,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const SizedBox(width: 104, height: 104),
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 6),
                           Text(
-                            'Fully grown! Added to your garden.',
+                            'You did it!',
                             textAlign: TextAlign.center,
-                            style: AppTheme.body(size: 11, weight: FontWeight.w700),
+                            style: AppTheme.pixelHeading(size: 11, color: AppColors.accentGreen),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Your plant is fully grown and now lives in your garden.',
+                            textAlign: TextAlign.center,
+                            style: AppTheme.body(size: 11, weight: FontWeight.w600),
                           ),
                         ],
                       ),
