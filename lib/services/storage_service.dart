@@ -16,12 +16,19 @@ class _Keys {
   static const email = 'email';
   static const isGuest = 'is_guest';
   static const memberSinceYear = 'member_since_year';
+  static const plantSpecies = 'plant_species';
+  static const harvestLog = 'harvest_log';
 
   static const all = [
     streak, totalSessions, plantStage, plantWilted, username,
     harvestedPlants, notesText, email, isGuest, memberSinceYear,
+    plantSpecies, harvestLog,
   ];
 }
+
+/// The plant id old saves didn't record (before there was more than one
+/// kind of plant, every harvest was a Wild Sunflower).
+const _legacySpecies = 'wild_sunflower';
 
 /// The one place the app reads and saves its data.
 ///
@@ -113,6 +120,9 @@ class StorageService extends ChangeNotifier {
     await _prefs.setInt(_Keys.plantStage, asInt(data['plantStage']));
     await _prefs.setBool(_Keys.plantWilted, data['plantWilted'] == true);
     await _prefs.setString(_Keys.notesText, data['notes']?.toString() ?? '');
+    await _prefs.setString(_Keys.plantSpecies, data['plantSpecies']?.toString() ?? _legacySpecies);
+    final log = data['harvestLog'];
+    await _prefs.setStringList(_Keys.harvestLog, log is List ? log.map((e) => e.toString()).toList() : const []);
 
     final name = data['username']?.toString() ?? '';
     if (name.isNotEmpty) await _prefs.setString(_Keys.username, name);
@@ -138,6 +148,8 @@ class StorageService extends ChangeNotifier {
         'harvestedPlants': harvestedPlants,
         'plantStage': savedPlantStage,
         'plantWilted': savedPlantWilted,
+        'plantSpecies': savedPlantSpecies,
+        'harvestLog': harvestLog,
         'notes': savedNotes,
         'email': email,
         'isGuest': isGuest,
@@ -196,7 +208,21 @@ class StorageService extends ChangeNotifier {
 
   int get harvestedPlants => _prefs.getInt(_Keys.harvestedPlants) ?? 0;
 
-  Future<void> recordHarvestedPlant() async {
+  /// Which plant each harvest was, oldest first — e.g.
+  /// ['wild_sunflower', 'wild_sunflower', 'desert_cactus'].
+  /// Harvests from before this list existed are counted as sunflowers.
+  List<String> get harvestLog {
+    final log = _prefs.getStringList(_Keys.harvestLog) ?? const <String>[];
+    final missing = harvestedPlants - log.length;
+    return [for (var i = 0; i < missing; i++) _legacySpecies, ...log];
+  }
+
+  /// How many of one kind of plant have been grown.
+  int harvestedCountOf(String speciesId) => harvestLog.where((id) => id == speciesId).length;
+
+  Future<void> recordHarvestedPlant({required String speciesId}) async {
+    final log = harvestLog; // read before bumping the count (keeps old sunflowers)
+    await _prefs.setStringList(_Keys.harvestLog, [...log, speciesId]);
     await _prefs.setInt(_Keys.harvestedPlants, harvestedPlants + 1);
     _scheduleSync();
     notifyListeners();
@@ -209,10 +235,19 @@ class StorageService extends ChangeNotifier {
   int get savedPlantStage => _prefs.getInt(_Keys.plantStage) ?? 0;
   bool get savedPlantWilted => _prefs.getBool(_Keys.plantWilted) ?? false;
 
+  String get savedPlantSpecies => _prefs.getString(_Keys.plantSpecies) ?? _legacySpecies;
+
   Future<void> savePlantState({required int stageIndex, required bool wilted}) async {
     await _prefs.setInt(_Keys.plantStage, stageIndex);
     await _prefs.setBool(_Keys.plantWilted, wilted);
     _scheduleSync();
+  }
+
+  /// Remembers which seed is planted (chosen on the Home screen).
+  Future<void> savePlantSpecies(String speciesId) async {
+    await _prefs.setString(_Keys.plantSpecies, speciesId);
+    _scheduleSync();
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------

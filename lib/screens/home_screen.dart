@@ -1,14 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/garden_progress.dart';
+import '../models/plant_catalog.dart';
 import '../models/plant_model.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/greenhouse_scene.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
-import '../widgets/plant_display.dart';
+import '../widgets/pixel_progress_bar.dart';
+import '../widgets/seed_picker.dart';
+import '../widgets/window_zoom.dart';
 import 'timer_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  /// Marks the greenhouse window, so the zoom knows where to fly into.
+  static final _windowKey = GlobalKey(debugLabel: 'greenhouseWindow');
+
+  void _startSession(BuildContext context) {
+    final zoom = WindowZoom.maybeOf(context);
+    final route = WindowZoom.throughWindowRoute<void>(const TimerScreen());
+    if (zoom == null) {
+      Navigator.of(context).push(route);
+    } else {
+      // The window swings open, the plant ducks, and the camera flies out
+      // through the middle into the meadow (the Timer screen).
+      zoom.zoomThrough(_windowKey, route);
+    }
+  }
 
   /// A little rotating encouragement line under the plant, matching the
   /// "Your cozy Fern is craving some focus light!" line in the Figma.
@@ -31,47 +52,202 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plant = context.watch<PlantModel>();
+    final storage = context.watch<StorageService>();
+    final progress = GardenProgress.from(
+      harvestedPlants: storage.harvestedPlants,
+      plantStageIndex: plant.stage.index,
+    );
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.screen,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PixelPanel(
-            backgroundColor: AppColors.panelDark,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          _Header(progress: progress, streak: storage.streak),
+          const SizedBox(height: AppSpacing.md),
+          // The greenhouse takes all the leftover height, so on tall
+          // phones the plant simply gets bigger — no empty cream gap.
+          Expanded(
+            child: Stack(
               children: [
-                Text('COZY GREENHOUSE', style: AppTheme.body(size: 13, color: AppColors.textCream, weight: FontWeight.bold)),
-                Text('LVL ${plant.level} ${plant.stage.label.toUpperCase()}',
-                    style: AppTheme.body(size: 12, color: AppColors.accentGold, weight: FontWeight.bold)),
+                Positioned.fill(child: GreenhouseScene(plant: plant, windowKey: _windowKey)),
+                // Seed packet tag: which plant is planted. Only a seed can
+                // be swapped, so it's tappable only before the first
+                // session of a new plant.
+                Positioned(
+                  left: 6,
+                  top: 6,
+                  child: _SeedTag(plant: plant, completedSessions: progress.completedSessions),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: PixelPanel(
-              backgroundColor: const Color(0xFFF6DFC0),
-              child: Center(child: PlantDisplay(plant: plant, size: 220)),
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
+          _GrowthTrack(plant: plant),
+          const SizedBox(height: AppSpacing.md),
           Text(
             '"${_quoteFor(plant)}"',
             textAlign: TextAlign.center,
             style: AppTheme.body(size: 13, weight: FontWeight.w600),
           ),
-          const Spacer(),
+          const SizedBox(height: AppSpacing.md),
           PixelButton(
             label: 'Start Study Session',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TimerScreen()),
-              );
-            },
+            onPressed: () => _startSession(context),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Little dark tag in the greenhouse corner: "🌱 Desert Cactus · CHANGE".
+class _SeedTag extends StatelessWidget {
+  const _SeedTag({required this.plant, required this.completedSessions});
+
+  final PlantModel plant;
+  final int completedSessions;
+
+  Future<void> _pick(BuildContext context) async {
+    final storage = context.read<StorageService>();
+    final id = await showSeedPicker(context, currentId: plant.speciesId, completedSessions: completedSessions);
+    if (id == null || !plant.canChangeSpecies) return;
+    plant.changeSpecies(id);
+    await storage.savePlantSpecies(plant.speciesId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canChange = plant.canChangeSpecies;
+    // Only worth offering once there's more than one plant to choose.
+    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions)).length;
+    final tappable = canChange && choices > 1;
+
+    final tag = PixelPanel(
+      style: PanelStyle.dark,
+      backgroundColor: const Color(0xE63E2A1B),
+      expand: false,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.spa, size: 14, color: AppColors.accentGreen),
+          const SizedBox(width: 6),
+          Text(plant.species.name, style: AppText.caption(color: AppColors.textCream)),
+          if (tappable) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              'CHANGE',
+              style: AppText.caption(color: AppColors.accentGold)
+                  .copyWith(fontWeight: FontWeight.w900, decoration: TextDecoration.underline, decorationColor: AppColors.accentGold),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (!tappable) return Semantics(label: 'Growing ${plant.species.name}', child: tag);
+    return Semantics(
+      button: true,
+      label: 'Planted seed: ${plant.species.name}. Change seed',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _pick(context),
+        // Extra invisible padding so the small tag is still easy to tap.
+        child: Padding(padding: const EdgeInsets.all(4), child: tag),
+      ),
+    );
+  }
+}
+
+/// "COZY GREENHOUSE · GARDEN LV 2" with the XP bar and streak underneath.
+class _Header extends StatelessWidget {
+  const _Header({required this.progress, required this.streak});
+
+  final GardenProgress progress;
+  final int streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final dimCream = AppColors.textCream.withValues(alpha: 0.8);
+
+    return PixelPanel(
+      style: PanelStyle.dark,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('COZY GREENHOUSE', style: AppText.panelTitle())),
+              Text('GARDEN LV ${progress.level}', style: AppText.panelTitle(color: AppColors.accentGold)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          PixelProgressBar(
+            value: progress.levelProgress,
+            height: 12,
+            fillColor: AppColors.accentGold,
+            semanticLabel: 'Garden experience',
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text(
+                '${progress.xpIntoLevel} / ${GardenProgress.xpPerLevel} XP',
+                style: AppText.caption(color: dimCream),
+              ),
+              const Spacer(),
+              const Icon(Icons.local_fire_department, size: 14, color: AppColors.accentGold),
+              const SizedBox(width: AppSpacing.xs),
+              Text('$streak in a row', style: AppText.caption(color: dimCream)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "PLANT GROWTH · GROW 3/5" and the 5-chunk stage bar.
+class _GrowthTrack extends StatelessWidget {
+  const _GrowthTrack({required this.plant});
+
+  final PlantModel plant;
+
+  @override
+  Widget build(BuildContext context) {
+    final stageCount = GrowthStage.values.length;
+    final stageNumber = plant.stage.index + 1;
+    final status = plant.isWilted
+        ? 'WILTED · $stageNumber/$stageCount'
+        : '${plant.stage.label.toUpperCase()} · $stageNumber/$stageCount';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('PLANT GROWTH', style: AppText.sectionLabel())),
+            Text(
+              status,
+              style: AppText.small(
+                color: plant.isWilted ? AppColors.dangerText : AppColors.greenDeep,
+                weight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        PixelProgressBar(
+          value: stageNumber / stageCount,
+          segments: stageCount,
+          // A wilted plant's bar goes dry brown instead of green.
+          fillColor: plant.isWilted ? const Color(0xFFA08560) : AppColors.accentGreen,
+          semanticLabel: 'Plant growth stage $stageNumber of $stageCount',
+        ),
+      ],
     );
   }
 }

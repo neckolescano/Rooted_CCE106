@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 import '../models/study_material.dart';
 import '../theme/app_theme.dart';
+import 'pixel_panel.dart';
 
-/// One study question. Handles both shapes: multiple choice (tap a
-/// choice to check it) and short answer (reveal the answer on tap).
+/// One study question on a parchment card. Handles both shapes:
+/// multiple choice (tap a choice to check it) and short answer (reveal
+/// the answer on tap).
 class StudyQuestionCard extends StatefulWidget {
   const StudyQuestionCard({
     super.key,
     required this.question,
     required this.selectedChoice,
     required this.onSelectChoice,
+    this.number,
+    this.total,
   });
 
   final StudyQuestion question;
   final String? selectedChoice;
   final ValueChanged<String> onSelectChoice;
+
+  /// Optional "QUESTION 2 / 5" label.
+  final int? number;
+  final int? total;
 
   @override
   State<StudyQuestionCard> createState() => _StudyQuestionCardState();
@@ -23,30 +31,46 @@ class StudyQuestionCard extends StatefulWidget {
 class _StudyQuestionCardState extends State<StudyQuestionCard> {
   bool _revealed = false;
 
+  // Answer tile colors. Correct/wrong also get a ✓/✗ icon, so the
+  // result never depends on color alone.
+  static const _correctFill = Color(0xFFD5E8BE);
+  static const _wrongFill = Color(0xFFF2C9C1);
+
   @override
   Widget build(BuildContext context) {
     final q = widget.question;
+    final selected = widget.selectedChoice;
+    final answeredCorrectly = selected != null && selected == q.answer;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.panelMedium.withOpacity(0.35)),
-      ),
+    return PixelPanel(
+      style: PanelStyle.parchment,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(q.question, style: AppTheme.body(size: 14, weight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          if (q.isMultipleChoice) ..._buildChoices(q) else ..._buildShortAnswer(q),
-          if (_revealed && (q.explanation?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 8),
+          if (widget.number != null && widget.total != null) ...[
             Text(
-              q.explanation!,
-              style: AppTheme.body(size: 11, color: AppColors.textDark.withOpacity(0.65)),
+              'QUESTION ${widget.number} / ${widget.total}',
+              style: AppText.caption(color: AppColors.panelMedium).copyWith(fontWeight: FontWeight.w900),
             ),
+            const SizedBox(height: 6),
+          ],
+          Text(q.question, style: AppTheme.body(size: 15, weight: FontWeight.w800)),
+          const SizedBox(height: AppSpacing.md),
+          if (q.isMultipleChoice) ..._buildChoices(q) else ..._buildShortAnswer(q),
+          if (_revealed && q.isMultipleChoice && selected != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              answeredCorrectly ? 'CORRECT!  Your knowledge is growing!' : "NOT QUITE!  Let's learn this one again.",
+              style: AppText.small(
+                color: answeredCorrectly ? AppColors.greenDeep : AppColors.dangerText,
+                weight: FontWeight.w900,
+              ),
+            ),
+          ],
+          if (_revealed && (q.explanation?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(q.explanation!, style: AppText.small(color: AppColors.textMuted, weight: FontWeight.w600)),
           ],
         ],
       ),
@@ -54,59 +78,86 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
   }
 
   List<Widget> _buildChoices(StudyQuestion q) {
-    return q.choices!.map((choice) {
-      final isSelected = widget.selectedChoice == choice;
-      final isCorrectChoice = choice == q.answer;
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    final choices = q.choices!;
 
-      Color background = AppColors.background;
-      Color border = AppColors.panelMedium.withOpacity(0.3);
-      if (_revealed && isSelected) {
-        background = isCorrectChoice ? AppColors.accentGreen.withOpacity(0.25) : const Color(0xFFE8A6A0);
-        border = isCorrectChoice ? AppColors.accentGreen : const Color(0xFFCC6B5C);
-      } else if (isSelected) {
-        border = AppColors.panelMedium;
-      }
+    return [
+      for (var i = 0; i < choices.length; i++) _choiceTile(q, choices[i], i < letters.length ? letters[i] : '•'),
+    ];
+  }
 
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+  Widget _choiceTile(StudyQuestion q, String choice, String letter) {
+    final isSelected = widget.selectedChoice == choice;
+    final isCorrectChoice = choice == q.answer;
+
+    Color? fill;
+    Color? outline;
+    IconData? mark;
+    if (_revealed && isSelected) {
+      fill = isCorrectChoice ? _correctFill : _wrongFill;
+      outline = isCorrectChoice ? AppColors.greenDeep : AppColors.dangerText;
+      mark = isCorrectChoice ? Icons.check : Icons.close;
+    } else if (_revealed && isCorrectChoice) {
+      // After a wrong pick, also show which one was right.
+      outline = AppColors.greenDeep;
+      mark = Icons.check;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: 'Option $letter: $choice',
+        excludeSemantics: true,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () {
             widget.onSelectChoice(choice);
             setState(() => _revealed = true);
           },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: border, width: 1.5),
+          child: PixelPanel(
+            style: PanelStyle.parchment,
+            sunken: !isSelected,
+            shadow: false,
+            backgroundColor: fill ?? const Color(0xFFFBEBD3),
+            outlineColor: outline,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+            child: Row(
+              children: [
+                Text('$letter.', style: AppTheme.body(size: 14, color: AppColors.panelMedium, weight: FontWeight.w900)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(choice, style: AppTheme.body(size: 14, weight: FontWeight.w600))),
+                if (mark != null) Icon(mark, size: 18, color: outline),
+              ],
             ),
-            child: Text(choice, style: AppTheme.body(size: 12)),
           ),
         ),
-      );
-    }).toList();
+      ),
+    );
   }
 
   List<Widget> _buildShortAnswer(StudyQuestion q) {
     if (!_revealed) {
       return [
-        GestureDetector(
-          onTap: () => setState(() => _revealed = true),
-          child: Text(
-            'Reveal answer',
-            style: AppTheme.body(size: 12, color: AppColors.panelMedium, weight: FontWeight.bold)
-                .copyWith(decoration: TextDecoration.underline),
+        Semantics(
+          button: true,
+          child: GestureDetector(
+            onTap: () => setState(() => _revealed = true),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'Reveal answer',
+                style: AppText.small(color: AppColors.panelMedium, weight: FontWeight.w900)
+                    .copyWith(decoration: TextDecoration.underline),
+              ),
+            ),
           ),
         ),
       ];
     }
     return [
-      Text(
-        q.answer,
-        style: AppTheme.body(size: 13, color: AppColors.accentGreen, weight: FontWeight.bold),
-      ),
+      Text(q.answer, style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800)),
     ];
   }
 }

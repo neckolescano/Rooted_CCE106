@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'pixel_button.dart';
+import 'pixel_scroll.dart';
 
 /// What the student typed into the email dialog.
 class EmailAuthResult {
@@ -68,15 +69,24 @@ class _EmailAuthDialogState extends State<EmailAuthDialog> {
   }
 
   InputDecoration _decoration(String label) {
+    // Square corners + 2px dark border, same as the pixel panels.
+    const border = OutlineInputBorder(
+      borderRadius: BorderRadius.zero,
+      borderSide:
+          BorderSide(color: AppColors.panelDark, width: AppBorders.width),
+    );
     return InputDecoration(
       labelText: label,
-      labelStyle: AppTheme.body(size: 12, color: AppColors.textDark.withOpacity(0.6)),
+      labelStyle: AppTheme.body(
+          size: 13, color: AppColors.textMuted, weight: FontWeight.w600),
+      floatingLabelStyle: AppTheme.body(
+          size: 13, color: AppColors.panelMedium, weight: FontWeight.w800),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.6),
-      isDense: true,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: const BorderSide(color: AppColors.panelDark, width: 1.5),
+      fillColor: const Color(0xFFFFF8EC),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: AppColors.panelMedium, width: 3),
       ),
     );
   }
@@ -84,67 +94,77 @@ class _EmailAuthDialogState extends State<EmailAuthDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.background,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: AppColors.panelDark, width: 3),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _isCreate ? 'CREATE ACCOUNT' : 'WELCOME BACK',
-              textAlign: TextAlign.center,
-              style: AppTheme.pixelHeading(size: 13),
-            ),
-            const SizedBox(height: 16),
-            if (_isCreate) ...[
-              TextField(controller: _username, decoration: _decoration('Username')),
-              const SizedBox(height: 10),
-            ],
-            TextField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              decoration: _decoration('Email'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _password,
-              obscureText: true,
-              decoration: _decoration('Password'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(AppSpacing.xl),
+      child: PixelScroll(
+        seal: const WaxSeal(icon: Icons.mail_outline),
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Text(
-                _error!,
+                _isCreate ? 'CREATE ACCOUNT' : 'WELCOME BACK',
                 textAlign: TextAlign.center,
-                style: AppTheme.body(size: 11, color: const Color(0xFFB23B2E)),
+                style: AppTheme.pixelHeading(size: 13),
+              ),
+              const SizedBox(height: 16),
+              if (_isCreate) ...[
+                TextField(
+                    controller: _username, decoration: _decoration('Username')),
+                const SizedBox(height: 10),
+              ],
+              TextField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _decoration('Email'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _password,
+                obscureText: true,
+                decoration: _decoration('Password'),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: AppText.small(color: AppColors.dangerText),
+                ),
+              ],
+              const SizedBox(height: 16),
+              PixelButton(
+                label: _isCreate ? 'Create Account' : 'Sign In',
+                onPressed: _submit,
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => setState(() {
+                  _isCreate = !_isCreate;
+                  _error = null;
+                }),
+                child: Text(
+                  _isCreate
+                      ? 'Already have an account? Sign in'
+                      : 'New here? Create an account',
+                  style: AppTheme.body(
+                      size: 12,
+                      color: AppColors.panelMedium,
+                      weight: FontWeight.bold),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Cancel', style: AppText.small()),
               ),
             ],
-            const SizedBox(height: 16),
-            PixelButton(
-              label: _isCreate ? 'Create Account' : 'Sign In',
-              onPressed: _submit,
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => setState(() {
-                _isCreate = !_isCreate;
-                _error = null;
-              }),
-              child: Text(
-                _isCreate ? 'Already have an account? Sign in' : 'New here? Create an account',
-                style: AppTheme.body(size: 12, color: AppColors.panelMedium, weight: FontWeight.bold),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: AppTheme.body(size: 12)),
-            ),
-          ],
+          ),
         ),
       ),
     );

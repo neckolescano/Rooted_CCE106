@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../widgets/pixel_bottom_nav.dart';
+import '../widgets/window_zoom.dart';
 import 'home_screen.dart';
 import 'garden_screen.dart';
 import 'profile_screen.dart';
@@ -23,67 +24,25 @@ class _MainShellState extends State<MainShell> {
     ProfileScreen(),
   ];
 
+  static const _navItems = [
+    PixelNavItem(icon: Icons.home, label: 'Home'),
+    PixelNavItem(icon: Icons.eco, label: 'Garden'),
+    PixelNavItem(icon: Icons.person, label: 'Profile'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: IndexedStack(index: _currentIndex, children: _screens),
-      ),
-      // IMPORTANT: this needs an explicit height. Without one, the Row
-      // below is handed unbounded vertical space and stretches to fill
-      // the whole screen instead of staying a slim bar — that's the bug
-      // you saw where "Home" took over the entire page.
-      bottomNavigationBar: SizedBox(
-        height: 76, // a little breathing room beyond the tightest fit
-        child: Container(
-          decoration: const BoxDecoration(color: AppColors.panelDark),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              children: [
-                _navItem(icon: Icons.home, label: 'Home', index: 0),
-                _navItem(icon: Icons.eco, label: 'Garden', index: 1),
-                _navItem(icon: Icons.person, label: 'Profile', index: 2),
-              ],
-            ),
-          ),
+    // WindowZoom wraps the WHOLE shell (nav bar included) so the "fly out
+    // through the greenhouse window" zoom moves everything, like a camera.
+    return WindowZoom(
+      child: Scaffold(
+        body: SafeArea(
+          child: IndexedStack(index: _currentIndex, children: _screens),
         ),
-      ),
-    );
-  }
-
-  Widget _navItem({required IconData icon, required String label, required int index}) {
-    final isSelected = _currentIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _currentIndex = index),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.panelMedium : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-            // Always reserve the same 1.5px border, just invisible when
-            // not selected. Only having a border on the SELECTED item
-            // used to shrink that one item's available content height
-            // by 3px (1.5 top + 1.5 bottom) compared to the others —
-            // that was the exact cause of the "overflowed by 3.0
-            // pixels" warning you saw on the Home tab.
-            border: Border.all(
-              color: isSelected ? AppColors.accentGold : Colors.transparent,
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.textCream, size: 22),
-              const SizedBox(height: 4),
-              Text(label, style: AppTheme.body(size: 10, color: AppColors.textCream, weight: FontWeight.bold)),
-            ],
-          ),
+        bottomNavigationBar: PixelBottomNav(
+          items: _navItems,
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
         ),
       ),
     );

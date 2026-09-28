@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'plant_catalog.dart';
 
 /// The 5 growth stages from your Chapter 1 doc.
 /// Order matters here — index 0 is youngest, index 4 is fully grown.
@@ -45,6 +46,11 @@ class PlantModel extends ChangeNotifier {
   GrowthStage stage = GrowthStage.seed;
   bool isWilted = false;
 
+  /// Which plant is growing (see plant_catalog.dart), e.g. 'desert_cactus'.
+  String speciesId = starterSpecies.id;
+
+  PlantSpecies get species => speciesById(speciesId);
+
   /// Level shown in the UI, e.g. "LVL 4 SPROUT" — just the stage index + 1.
   int get level => stage.index + 1;
 
@@ -52,7 +58,17 @@ class PlantModel extends ChangeNotifier {
   /// There's no separate "wilted" art file — PlantDisplay applies a
   /// grey/brown tint on top of this same image when isWilted is true,
   /// so one sprite per stage is all that's needed.
-  String get assetPath => 'assets/images/plant/stages/${stage.assetName}.png';
+  String get assetPath => species.stageAsset(stage.assetName);
+
+  /// Only a seed can be swapped for a different kind of plant.
+  bool get canChangeSpecies => stage == GrowthStage.seed;
+
+  /// Plant a different seed. Ignored once the plant has started growing.
+  void changeSpecies(String id) {
+    if (!canChangeSpecies || id == speciesId) return;
+    speciesId = speciesById(id).id;
+    notifyListeners();
+  }
 
   bool get isFullyGrown => stage == GrowthStage.fullGrown;
 
@@ -65,11 +81,12 @@ class PlantModel extends ChangeNotifier {
     return '${stage.assetName}_${next.assetName}';
   }
 
-  /// The 10 frame paths for a given transition key, in play order.
-  static List<String> framePathsFor(String transitionKey) {
+  /// The 10 frame paths for a given transition key, in play order, for
+  /// the plant that's currently growing.
+  List<String> framePathsFor(String transitionKey) {
     return List.generate(
       10,
-      (i) => 'assets/images/plant/frames/${transitionKey}_0$i.png',
+      (i) => '${species.assetRoot}/frames/${transitionKey}_0$i.png',
     );
   }
 
@@ -98,9 +115,10 @@ class PlantModel extends ChangeNotifier {
   }
 
   /// Restore saved progress (used by StorageService on app start).
-  void loadFrom({required int stageIndex, required bool wilted}) {
+  void loadFrom({required int stageIndex, required bool wilted, String? speciesId}) {
     stage = GrowthStage.values[stageIndex.clamp(0, GrowthStage.values.length - 1)];
     isWilted = wilted;
+    this.speciesId = speciesById(speciesId).id;
     notifyListeners();
   }
 }

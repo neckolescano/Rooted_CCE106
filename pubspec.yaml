@@ -35,3 +35,10 @@ flutter:
     - assets/images/backgrounds/
     - assets/images/buttons/
     - assets/images/popups/
+    # Extra collectible plants (made by tool/generate_plants.dart)
+    - assets/images/plants/desert_cactus/stages/
+    - assets/images/plants/desert_cactus/frames/
+    - assets/images/plants/forest_fern/stages/
+    - assets/images/plants/forest_fern/frames/
+    - assets/images/plants/moonpetal_lily/stages/
+    - assets/images/plants/moonpetal_lily/frames/

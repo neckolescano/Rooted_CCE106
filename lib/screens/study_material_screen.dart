@@ -4,7 +4,10 @@ import '../models/notes_model.dart';
 import '../models/study_material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compact_timer_header.dart';
+import '../widgets/desk_background.dart';
 import '../widgets/flashcard_widget.dart';
+import '../widgets/pixel_icon_button.dart';
+import '../widgets/pixel_panel.dart';
 import '../widgets/study_question_card.dart';
 
 class StudyMaterialScreen extends StatefulWidget {
@@ -20,78 +23,95 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
   bool _flashcardFlipped = false;
   final Map<int, String> _selectedChoices = {};
 
+  static const _shadowedCream = [Shadow(offset: Offset(0, 2), color: Color(0x99000000))];
+
   @override
   Widget build(BuildContext context) {
     final material = context.watch<NotesModel>().material;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-                  ),
-                  Text('Study Material', style: AppTheme.pixelHeading(size: 15)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              const CompactTimerHeader(),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _tabButton('Questions', !_showFlashcards, () => setState(() => _showFlashcards = false))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _tabButton('Flashcards', _showFlashcards, () => setState(() => _showFlashcards = true))),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: material == null
-                    ? Center(child: Text('No study material yet.', style: AppTheme.body(size: 13)))
-                    : (_showFlashcards ? _buildFlashcards(material.flashcards) : _buildQuestions(material.questions)),
-              ),
-            ],
+      backgroundColor: AppColors.panelMedium,
+      body: DeskBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: AppSpacing.screen,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    PixelIconButton(
+                      icon: Icons.arrow_back,
+                      semanticLabel: 'Back to your journal',
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        'Study Patch',
+                        style: AppText.screenTitle(color: AppColors.textCream).copyWith(shadows: _shadowedCream),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const CompactTimerHeader(),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Tab(
+                        label: 'Questions',
+                        icon: Icons.quiz,
+                        selected: !_showFlashcards,
+                        onTap: () => setState(() => _showFlashcards = false),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _Tab(
+                        label: 'Flashcards',
+                        icon: Icons.style,
+                        selected: _showFlashcards,
+                        onTap: () => setState(() => _showFlashcards = true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Expanded(
+                  child: material == null
+                      ? _emptyMessage('No study material yet.')
+                      : (_showFlashcards ? _buildFlashcards(material.flashcards) : _buildQuestions(material.questions)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _tabButton(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.panelMedium : AppColors.panelMedium.withOpacity(0.25),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.panelDark, width: 1.5),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: AppTheme.body(size: 12, color: AppColors.textCream, weight: FontWeight.bold),
-        ),
+  Widget _emptyMessage(String text) {
+    return Center(
+      child: PixelPanel(
+        style: PanelStyle.parchment,
+        expand: false,
+        child: Text(text, style: AppText.body()),
       ),
     );
   }
 
   Widget _buildQuestions(List<StudyQuestion> questions) {
-    if (questions.isEmpty) {
-      return Center(child: Text('No questions were generated.', style: AppTheme.body(size: 13)));
-    }
+    if (questions.isEmpty) return _emptyMessage('No questions were generated.');
+
     return ListView.separated(
       itemCount: questions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         return StudyQuestionCard(
+          number: index + 1,
+          total: questions.length,
           question: questions[index],
           selectedChoice: _selectedChoices[index],
           onSelectChoice: (choice) => setState(() => _selectedChoices[index] = choice),
@@ -101,48 +121,94 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
   }
 
   Widget _buildFlashcards(List<Flashcard> cards) {
-    if (cards.isEmpty) {
-      return Center(child: Text('No flashcards were generated.', style: AppTheme.body(size: 13)));
-    }
+    if (cards.isEmpty) return _emptyMessage('No flashcards were generated.');
     final card = cards[_flashcardIndex];
+
+    void goTo(int index) => setState(() {
+          _flashcardIndex = index;
+          _flashcardFlipped = false;
+        });
 
     return Column(
       children: [
         Expanded(
           child: Center(
             child: FlashcardWidget(
+              // New key per card so the flip animation resets instead of
+              // animating from the previous card's side.
+              key: ValueKey(_flashcardIndex),
               flashcard: card,
               flipped: _flashcardFlipped,
               onTap: () => setState(() => _flashcardFlipped = !_flashcardFlipped),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.md),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            TextButton(
-              onPressed: _flashcardIndex == 0
-                  ? null
-                  : () => setState(() {
-                        _flashcardIndex--;
-                        _flashcardFlipped = false;
-                      }),
-              child: const Text('Previous'),
+            PixelIconButton(
+              icon: Icons.arrow_back,
+              label: 'PREV',
+              semanticLabel: 'Previous card',
+              style: PanelStyle.dark,
+              onPressed: _flashcardIndex == 0 ? null : () => goTo(_flashcardIndex - 1),
             ),
-            Text('${_flashcardIndex + 1} / ${cards.length}', style: AppTheme.body(size: 12, weight: FontWeight.bold)),
-            TextButton(
-              onPressed: _flashcardIndex >= cards.length - 1
-                  ? null
-                  : () => setState(() {
-                        _flashcardIndex++;
-                        _flashcardFlipped = false;
-                      }),
-              child: const Text('Next'),
+            Expanded(
+              child: Text(
+                '${_flashcardIndex + 1} / ${cards.length}',
+                textAlign: TextAlign.center,
+                style: AppTheme.pixelHeading(size: 12, color: AppColors.textCream).copyWith(shadows: _shadowedCream),
+              ),
+            ),
+            PixelIconButton(
+              icon: Icons.arrow_forward,
+              label: 'NEXT',
+              semanticLabel: 'Next card',
+              style: PanelStyle.dark,
+              onPressed: _flashcardIndex >= cards.length - 1 ? null : () => goTo(_flashcardIndex + 1),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Questions | Flashcards switch. Selected = wood slot with gold outline
+/// (same as the bottom nav), unselected = dark plank.
+class _Tab extends StatelessWidget {
+  const _Tab({required this.label, required this.icon, required this.selected, required this.onTap});
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.textCream : AppColors.textCream.withValues(alpha: 0.7);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: PixelPanel(
+          style: selected ? PanelStyle.wood : PanelStyle.dark,
+          outlineColor: selected ? AppColors.accentGold : null,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: selected ? AppColors.accentGold : color),
+              const SizedBox(width: 6),
+              Text(label.toUpperCase(), style: AppText.panelTitle(color: color)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

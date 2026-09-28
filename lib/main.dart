@@ -50,7 +50,11 @@ Future<void> main() async {
       email: user.email,
       isGuest: user.isAnonymous,
     );
-    plant.loadFrom(stageIndex: storage.savedPlantStage, wilted: storage.savedPlantWilted);
+    plant.loadFrom(
+      stageIndex: storage.savedPlantStage,
+      wilted: storage.savedPlantWilted,
+      speciesId: storage.savedPlantSpecies,
+    );
     notes.loadFrom(storage.savedNotes);
   }
 

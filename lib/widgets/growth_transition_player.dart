@@ -9,11 +9,14 @@ import '../models/plant_model.dart';
 class GrowthTransitionPlayer extends StatefulWidget {
   const GrowthTransitionPlayer({
     super.key,
+    required this.plant,
     required this.transitionKey,
     required this.onFinished,
     this.size = 150,
   });
 
+  /// Which plant is growing — decides which folder the frames come from.
+  final PlantModel plant;
   final String transitionKey;
   final VoidCallback onFinished;
   final double size;
@@ -40,7 +43,7 @@ class _GrowthTransitionPlayerState extends State<GrowthTransitionPlayer> {
   @override
   void initState() {
     super.initState();
-    _framePaths = PlantModel.framePathsFor(widget.transitionKey);
+    _framePaths = widget.plant.framePathsFor(widget.transitionKey);
   }
 
   @override

@@ -8,7 +8,11 @@ import '../widgets/background_scene.dart';
 import '../widgets/growth_transition_player.dart';
 import '../widgets/harvest_celebration_dialog.dart';
 import '../widgets/pixel_button.dart';
+import '../widgets/pixel_dialog.dart';
+import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
+import '../widgets/pixel_progress_bar.dart';
+import '../widgets/pixel_timer_display.dart';
 import '../widgets/plant_display.dart';
 import 'notes_screen.dart';
 
@@ -27,6 +31,9 @@ class _TimerScreenState extends State<TimerScreen> {
   // True only once THIS screen has actually confirmed its own start()
   // call went through. See initState() below for why this exists.
   bool _sessionStarted = false;
+
+  // See-through dark panel so text stays readable over the meadow.
+  static const _glassDark = Color(0xE63E2A1B);
 
   @override
   void initState() {
@@ -55,6 +62,45 @@ class _TimerScreenState extends State<TimerScreen> {
     });
   }
 
+  /// Asks first — one accidental tap used to wilt the plant instantly.
+  Future<void> _confirmGiveUp() async {
+    final session = context.read<SessionModel>();
+    // Nothing to give up once the countdown is over (or the growth
+    // animation is playing).
+    if (_isGrowing || session.status == SessionStatus.completed) return;
+
+    final confirmed = await showPixelConfirm(
+      context,
+      title: 'Give up?',
+      sealIcon: Icons.eco,
+      message: 'Your plant needs you until the timer runs out. '
+          'If you leave now, it will wilt.',
+      confirmLabel: 'Give up',
+      cancelLabel: 'Keep growing',
+      danger: true,
+    );
+    // Re-check: the timer may have finished while the popup was open.
+    if (!confirmed || !mounted) return;
+    final status = context.read<SessionModel>().status;
+    if (_isGrowing || status == SessionStatus.completed) return;
+    await _handleGiveUp();
+  }
+
+  /// Closes anything sitting on top of this screen — the Give Up popup,
+  /// the Notes journal, Study Material — so this screen is the top route
+  /// again.
+  ///
+  /// BUG FIX: when the timer ended with a popup open, the "session done,
+  /// go home" step called Navigator.pop(), which closed the POPUP instead
+  /// of this screen. The timer then sat there with its buttons disabled
+  /// (they're off while the plant grows) and looked frozen.
+  void _closeEverythingOnTop() {
+    final myRoute = ModalRoute.of(context);
+    if (myRoute != null && !myRoute.isCurrent) {
+      Navigator.of(context).popUntil((route) => route == myRoute);
+    }
+  }
+
   Future<void> _handleGiveUp() async {
     final session = context.read<SessionModel>();
     final plant = context.read<PlantModel>();
@@ -76,6 +122,9 @@ class _TimerScreenState extends State<TimerScreen> {
   /// there's nothing to animate, so finish right away.
   void _beginGrowthSequence() {
     if (_isGrowing) return; // guard against firing more than once
+    // Come back to this screen (from a popup or the Notes journal) so
+    // the student actually sees their plant grow.
+    _closeEverythingOnTop();
     final plant = context.read<PlantModel>();
     final key = plant.transitionKeyToNextStage;
     if (key == null) {
@@ -106,7 +155,9 @@ class _TimerScreenState extends State<TimerScreen> {
       return;
     }
 
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    _closeEverythingOnTop(); // make sure pop() closes THIS screen
+    Navigator.of(context).pop();
   }
 
   /// Records the harvest, resets the plant back to a seed so the next
@@ -116,15 +167,21 @@ class _TimerScreenState extends State<TimerScreen> {
     final plant = context.read<PlantModel>();
     final storage = context.read<StorageService>();
 
-    await storage.recordHarvestedPlant();
+    // Remember WHICH plant was grown before the pot is reset.
+    final grown = plant.species;
+    await storage.recordHarvestedPlant(speciesId: grown.id);
     plant.resetToSeed();
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: false);
 
     if (!mounted) return;
+    _closeEverythingOnTop();
     final startAnotherSession = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const HarvestCelebrationDialog(),
+      // Dark enough that the popup is clearly the focus, but the meadow
+      // still shows through faintly.
+      barrierColor: AppColors.overlay,
+      builder: (_) => HarvestCelebrationDialog(plantAsset: grown.fullGrownAsset, plantName: grown.name),
     );
 
     if (!mounted) return;
@@ -141,10 +198,20 @@ class _TimerScreenState extends State<TimerScreen> {
     }
   }
 
+  /// Biggest clean size for the 128px plant that fits the space left.
+  double _plantSizeFor(BoxConstraints c) {
+    for (final size in const [256.0, 192.0, 160.0, 128.0]) {
+      if (size <= c.maxHeight && size <= c.maxWidth) return size;
+    }
+    return 96;
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionModel>();
     final plant = context.watch<PlantModel>();
+    final isPaused = session.status == SessionStatus.paused;
+    final progress = 1 - session.secondsLeft / SessionModel.sessionLengthSeconds;
 
     // React the moment the countdown hits zero. The _sessionStarted
     // check matters: without it, this could misfire on a leftover
@@ -154,127 +221,139 @@ class _TimerScreenState extends State<TimerScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _beginGrowthSequence());
     }
 
-    return Scaffold(
-      // This screen is pushed as its own route (not inside MainShell), so
-      // it needs its own Scaffold — without one there's nothing to paint
-      // a background, and it falls through to plain black.
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: BackgroundScene(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.panelDark.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text('SESSION EN ROUTE', style: AppTheme.body(size: 13, color: AppColors.textCream, weight: FontWeight.bold)),
-                    ),
-                    // Opens the Notes page. This just pushes on top of
-                    // the existing route — SessionModel isn't touched,
-                    // so the countdown keeps running underneath exactly
-                    // as it was, and this screen's own state (like
-                    // _isGrowing) is preserved too since it's never
-                    // disposed, just paused off-screen.
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const NotesScreen()),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.panelDark.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.edit_note, size: 16, color: AppColors.accentGold),
-                            const SizedBox(width: 4),
-                            Text('NOTES', style: AppTheme.body(size: 12, color: AppColors.accentGold, weight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                PixelPanel(
-                  backgroundColor: AppColors.panelMedium,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    // The phone's back button used to quietly leave this screen while
+    // the countdown kept running with nobody listening — so the plant
+    // never grew. Now back asks the same "Give up?" question instead.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmGiveUp();
+      },
+      child: Scaffold(
+        // This screen is pushed as its own route (not inside MainShell), so
+        // it needs its own Scaffold — without one there's nothing to paint
+        // a background, and it falls through to plain black.
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: BackgroundScene(
+            child: Padding(
+              padding: AppSpacing.screen,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      Text(session.formattedTime, style: AppTheme.pixelHeading(size: 36, color: AppColors.textCream)),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.panelDark,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('FOCUS MODE', style: AppTheme.body(size: 10, color: AppColors.accentGold, weight: FontWeight.bold)),
+                      PixelPanel(
+                        style: PanelStyle.dark,
+                        expand: false,
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+                        child: Text('SESSION EN ROUTE', style: AppText.panelTitle()),
+                      ),
+                      const Spacer(),
+                      // Opens the Notes page. This just pushes on top of
+                      // the existing route — SessionModel isn't touched,
+                      // so the countdown keeps running underneath exactly
+                      // as it was, and this screen's own state (like
+                      // _isGrowing) is preserved too since it's never
+                      // disposed, just paused off-screen.
+                      PixelIconButton(
+                        icon: Icons.edit_note,
+                        label: 'NOTES',
+                        semanticLabel: 'Open study notes. The timer keeps running.',
+                        // Off while the plant is growing, so nothing can
+                        // open on top during the growth animation.
+                        onPressed: _isGrowing
+                            ? null
+                            : () => Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const NotesScreen()),
+                                ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-                // This open space is where the meadow background actually
-                // gets to show — the plant now sits IN a scene instead of
-                // floating in empty space.
-                Expanded(
-                  child: Center(
-                    child: _isGrowing
-                        ? GrowthTransitionPlayer(
-                            transitionKey: _growthTransitionKey!,
-                            onFinished: _finishSession,
-                            size: 220,
-                          )
-                        : PlantDisplay(plant: plant, size: 220),
+                  const SizedBox(height: AppSpacing.md),
+                  PixelTimerDisplay(
+                    time: session.formattedTime,
+                    label: isPaused ? 'PAUSED' : 'FOCUS MODE',
                   ),
-                ),
-                const SizedBox(height: 16),
-                PixelPanel(
-                  backgroundColor: AppColors.panelDark.withOpacity(0.9),
-                  child: Text(
-                    'Your ${plant.stage.label} is growing quietly. '
-                    'Keep off social media until the timer runs out!',
-                    textAlign: TextAlign.center,
-                    style: AppTheme.body(size: 12, color: AppColors.textCream),
+                  const SizedBox(height: 10),
+                  PixelPanel(
+                    style: PanelStyle.dark,
+                    backgroundColor: _glassDark,
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, 10, AppSpacing.md, AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text('PLANT GROWTH', style: AppText.caption(color: AppColors.textCream))),
+                            Text('${(progress * 100).round()}%', style: AppText.caption(color: AppColors.accentGold)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        PixelProgressBar(value: progress, height: 12, semanticLabel: 'Session progress'),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: PixelButton(
-                        label: session.status == SessionStatus.paused ? 'Resume' : 'Pause',
-                        onPressed: () {
-                          if (session.status == SessionStatus.paused) {
-                            session.resume();
-                          } else {
-                            session.pause();
-                          }
-                        },
-                      ),
+                  // This open space is where the meadow background actually
+                  // gets to show — the plant sits IN the scene.
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final size = _plantSizeFor(constraints);
+                        return Center(
+                          child: _isGrowing
+                              ? GrowthTransitionPlayer(
+                                  plant: plant,
+                                  transitionKey: _growthTransitionKey!,
+                                  onFinished: _finishSession,
+                                  size: size,
+                                )
+                              : PlantDisplay(plant: plant, size: size),
+                        );
+                      },
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: PixelButton(
-                        label: 'Give Up',
-                        tint: const Color(0xFFCC6B5C), // reddish wash over the wood plaque
-                        onPressed: _handleGiveUp,
-                      ),
+                  ),
+                  PixelPanel(
+                    style: PanelStyle.dark,
+                    backgroundColor: _glassDark,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                    child: Text(
+                      'Your ${plant.stage.label} is growing quietly. '
+                      'Keep off social media until the timer runs out!',
+                      textAlign: TextAlign.center,
+                      style: AppTheme.body(size: 12, color: AppColors.textCream, weight: FontWeight.w600),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PixelButton(
+                          label: isPaused ? 'Resume' : 'Pause',
+                          icon: isPaused ? Icons.play_arrow : Icons.pause,
+                          onPressed: _isGrowing
+                              ? null
+                              : () {
+                                  if (isPaused) {
+                                    session.resume();
+                                  } else {
+                                    session.pause();
+                                  }
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: PixelButton(
+                          label: 'Give Up',
+                          tone: ButtonTone.danger,
+                          onPressed: _isGrowing ? null : _confirmGiveUp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
