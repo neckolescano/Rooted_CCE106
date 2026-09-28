@@ -57,7 +57,8 @@ class _TimerScreenState extends State<TimerScreen> {
     // we know THIS screen's own start() has actually run.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<SessionModel>().start();
+      // The length picked with the FOCUS TIME setter on Home.
+      context.read<SessionModel>().start(minutes: context.read<StorageService>().focusMinutes);
       setState(() => _sessionStarted = true);
     });
   }
@@ -109,7 +110,7 @@ class _TimerScreenState extends State<TimerScreen> {
     session.giveUp();
     plant.wilt();
     await storage.recordFailedSession(
-      elapsedSeconds: SessionModel.sessionLengthSeconds - session.secondsLeft,
+      elapsedSeconds: session.elapsedSeconds,
     );
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
 
@@ -142,7 +143,8 @@ class _TimerScreenState extends State<TimerScreen> {
     final storage = context.read<StorageService>();
 
     plant.grow();
-    await storage.recordCompletedSession(durationSeconds: SessionModel.sessionLengthSeconds);
+    final studied = context.read<SessionModel>().durationSeconds;
+    await storage.recordCompletedSession(durationSeconds: studied);
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
 
     // This covers BOTH cases: the plant just grew into its final stage
@@ -192,7 +194,7 @@ class _TimerScreenState extends State<TimerScreen> {
         _isGrowing = false;
         _growthTransitionKey = null;
       });
-      context.read<SessionModel>().start();
+      context.read<SessionModel>().start(minutes: context.read<StorageService>().focusMinutes);
     } else {
       Navigator.of(context).pop();
     }
@@ -211,7 +213,7 @@ class _TimerScreenState extends State<TimerScreen> {
     final session = context.watch<SessionModel>();
     final plant = context.watch<PlantModel>();
     final isPaused = session.status == SessionStatus.paused;
-    final progress = 1 - session.secondsLeft / SessionModel.sessionLengthSeconds;
+    final progress = session.progress;
 
     // React the moment the countdown hits zero. The _sessionStarted
     // check matters: without it, this could misfire on a leftover

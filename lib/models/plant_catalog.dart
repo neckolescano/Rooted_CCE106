@@ -42,6 +42,9 @@ class PlantSpecies {
 
   String get fullGrownAsset => '$assetRoot/stages/fullgrown.png';
   String stageAsset(String stageName) => '$assetRoot/stages/$stageName.png';
+
+  /// Drooping, dried-out version of a stage (made by tool/generate_plants.dart).
+  String wiltedAsset(String stageName) => '$assetRoot/wilted/$stageName.png';
 }
 
 /// Every plant in the game, in unlock order.

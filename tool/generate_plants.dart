@@ -442,10 +442,95 @@ List<Uint32List> transition(Uint32List from, Uint32List to) {
 }
 
 // ---------------------------------------------------------------------------
+// Wilted versions (made from ANY plant's stage PNGs — including your
+// hand-drawn sunflower)
+// ---------------------------------------------------------------------------
+
+// Dry colour ramps, light → dark.
+const _dryGreen = [0xFFB8A95E, 0xFF8E7C3C, 0xFF6B5627, 0xFF45361A];
+const _dryYellow = [0xFFC9A64A, 0xFFA07E2E, 0xFF7A5A20, 0xFF4E3A14];
+const _dryPetal = [0xFFCDB3AA, 0xFFA2827C, 0xFF7C5E5A, 0xFF4E3A38];
+
+/// Makes a wilted copy of a stage:
+///   1. the plant slumps, its outer leaves droop, and the top leans over
+///   2. greens dry out to olive-brown, yellows go dull, pink/lavender fade
+///   3. glowing sparkles go out
+/// The soil below row 92 is left exactly as it was.
+Uint32List wilt(Uint32List source) {
+  var top = ground;
+  for (var i = 0; i < size * size; i++) {
+    if ((source[i] >> 24) != 0) {
+      top = math.min(top, i ~/ size);
+      break;
+    }
+  }
+  final plantHeight = math.max(1, ground - top);
+
+  final out = Uint32List(size * size);
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      if (y > ground) {
+        out[y * size + x] = source[y * size + x];
+        continue;
+      }
+      // Work backwards: which source pixel lands here after drooping?
+      final h = (ground - y) / plantHeight; // 0 at soil … 1 at the top
+      final lean = 5 * h * h; // top tips to the right
+      final spread = ((x - baseX).abs() / 30.0).clamp(0.0, 1.6);
+      final droop = 6 * math.pow(spread, 1.5) * math.min(1, (ground - y) / 18); // outer leaves sag
+      final slump = 4 * h; // whole plant sinks a little
+      final sx = (x - lean).round();
+      final sy = (y - droop - slump).round();
+      if (sx < 0 || sx >= size || sy < 0 || sy > ground) continue;
+      out[y * size + x] = _dryColor(source[sy * size + sx]);
+    }
+  }
+  return out;
+}
+
+int _dryColor(int argb) {
+  final a = argb >> 24 & 0xFF;
+  if (a == 0) return 0;
+  final r = (argb >> 16 & 0xFF) / 255, g = (argb >> 8 & 0xFF) / 255, b = (argb & 0xFF) / 255;
+  final maxC = math.max(r, math.max(g, b)), minC = math.min(r, math.min(g, b));
+  final v = maxC, s = maxC == 0 ? 0.0 : (maxC - minC) / maxC;
+  if (v < 0.12 || s < 0.15) return argb; // outlines, spines, pale bits stay
+
+  double hue;
+  final d = maxC - minC;
+  if (maxC == r) {
+    hue = 60 * (((g - b) / d) % 6);
+  } else if (maxC == g) {
+    hue = 60 * ((b - r) / d + 2);
+  } else {
+    hue = 60 * ((r - g) / d + 4);
+  }
+  if (hue < 0) hue += 360;
+
+  int pick(List<int> ramp) => ramp[v > 0.7 ? 0 : (v > 0.5 ? 1 : (v > 0.3 ? 2 : 3))];
+
+  if (hue >= 180 && hue < 205) return 0; // glow sparkles fade away
+  if (hue >= 70 && hue < 180) return pick(_dryGreen); // leaves, stems, cactus
+  if (hue >= 45 && hue < 70) return pick(_dryYellow); // sunflower petals, flower centres
+  if (hue >= 240 || hue < 15) return pick(_dryPetal); // pink / lavender petals
+  return argb; // browns: seed, soil, spores
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 const stageNames = ['seed', 'sprout', 'grow', 'bloom', 'fullgrown'];
+
+/// Writes <root>/wilted/<stage>.png for every stage in <root>/stages/.
+void writeWilted(String root) {
+  Directory('$root/wilted').createSync(recursive: true);
+  for (final name in stageNames) {
+    final stage = decodePng(File('$root/stages/$name.png').readAsBytesSync());
+    File('$root/wilted/$name.png').writeAsBytesSync(encodePng(wilt(stage)));
+  }
+  stdout.writeln('Wrote $root/wilted (5 stages)');
+}
 
 void main() {
   final seed = decodePng(File('assets/images/plant/stages/seed.png').readAsBytesSync());
@@ -477,7 +562,12 @@ void main() {
       }
     }
     stdout.writeln('Wrote $root (5 stages, 40 frames)');
+    writeWilted(root);
   }
+
+  // Your hand-drawn sunflower gets a wilted set too (its own art is
+  // never changed — only the wilted/ folder is written).
+  writeWilted('assets/images/plant');
 }
 
 // ---------------------------------------------------------------------------

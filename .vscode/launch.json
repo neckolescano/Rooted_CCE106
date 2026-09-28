@@ -1,0 +1,23 @@
+{
+  // Press F5 (or Run → Start Debugging) and pick "kuwaGO".
+  // It passes your App Check debug token from app_check.local.json
+  // (a git-ignored file) so the AI features work on your phone.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "kuwaGO",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=app_check.local.json"]
+    },
+    {
+      "name": "kuwaGO (profile — smooth animations)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "profile",
+      "toolArgs": ["--dart-define-from-file=app_check.local.json"]
+    }
+  ]
+}

@@ -18,11 +18,14 @@ dependencies:
   google_sign_in: ^7.2.0
   firebase_ai: ^4.0.0
   firebase_app_check: ^0.4.8
+  image_picker: ^1.2.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 flutter:
   uses-material-design: true
@@ -32,13 +35,45 @@ flutter:
   assets:
     - assets/images/plant/stages/
     - assets/images/plant/frames/
+    - assets/images/plant/wilted/
     - assets/images/backgrounds/
     - assets/images/buttons/
     - assets/images/popups/
     # Extra collectible plants (made by tool/generate_plants.dart)
     - assets/images/plants/desert_cactus/stages/
     - assets/images/plants/desert_cactus/frames/
+    - assets/images/plants/desert_cactus/wilted/
     - assets/images/plants/forest_fern/stages/
     - assets/images/plants/forest_fern/frames/
+    - assets/images/plants/forest_fern/wilted/
     - assets/images/plants/moonpetal_lily/stages/
     - assets/images/plants/moonpetal_lily/frames/
+    - assets/images/plants/moonpetal_lily/wilted/
+
+# ---------------------------------------------------------------------------
+# App icon. Art lives in assets/icon/ (made by tool/generate_icon.dart —
+# or drop in your own files with the same names). After changing it run:
+#   dart run flutter_launcher_icons
+# ---------------------------------------------------------------------------
+flutter_launcher_icons:
+  android: true
+  ios: false # this project has no ios/ folder
+  image_path: "assets/icon/app_icon.png"
+  # Android 8+ "adaptive" icon: the launcher crops it to a circle/squircle.
+  adaptive_icon_background: "#DCEFC8"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+# ---------------------------------------------------------------------------
+# Launch splash: what the phone shows for the split second before Flutter
+# starts (it used to be black/white). After changing it run:
+#   dart run flutter_native_splash:create
+# The animated grass loading screen (lib/screens/loading_screen.dart)
+# takes over right after this.
+# ---------------------------------------------------------------------------
+flutter_native_splash:
+  color: "#F3E8D2"
+  image: assets/icon/splash_logo.png
+  android_12:
+    color: "#F3E8D2"
+    image: assets/icon/splash_logo.png
+  web: false

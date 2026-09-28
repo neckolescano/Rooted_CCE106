@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cloud_service.dart';
@@ -18,11 +19,14 @@ class _Keys {
   static const memberSinceYear = 'member_since_year';
   static const plantSpecies = 'plant_species';
   static const harvestLog = 'harvest_log';
+  static const avatar = 'avatar_base64';
+  static const avatarPixel = 'avatar_pixel';
+  static const focusMinutes = 'focus_minutes';
 
   static const all = [
     streak, totalSessions, plantStage, plantWilted, username,
     harvestedPlants, notesText, email, isGuest, memberSinceYear,
-    plantSpecies, harvestLog,
+    plantSpecies, harvestLog, avatar, avatarPixel, focusMinutes,
   ];
 }
 
@@ -123,6 +127,10 @@ class StorageService extends ChangeNotifier {
     await _prefs.setString(_Keys.plantSpecies, data['plantSpecies']?.toString() ?? _legacySpecies);
     final log = data['harvestLog'];
     await _prefs.setStringList(_Keys.harvestLog, log is List ? log.map((e) => e.toString()).toList() : const []);
+    await _prefs.setString(_Keys.avatar, data['avatar']?.toString() ?? '');
+    await _prefs.setBool(_Keys.avatarPixel, data['avatarPixel'] != false);
+    final minutes = data['focusMinutes'];
+    if (minutes is num && minutes > 0) await _prefs.setInt(_Keys.focusMinutes, minutes.toInt());
 
     final name = data['username']?.toString() ?? '';
     if (name.isNotEmpty) await _prefs.setString(_Keys.username, name);
@@ -150,6 +158,10 @@ class StorageService extends ChangeNotifier {
         'plantWilted': savedPlantWilted,
         'plantSpecies': savedPlantSpecies,
         'harvestLog': harvestLog,
+        'avatarPixel': avatarPixelated,
+        'focusMinutes': focusMinutes,
+        // The photo itself is NOT in here on purpose — it's ~30 KB, so it's
+        // only uploaded when it changes (see setAvatar), not on every sync.
         'notes': savedNotes,
         'email': email,
         'isGuest': isGuest,
@@ -270,8 +282,71 @@ class StorageService extends ChangeNotifier {
   bool get isGuest => _prefs.getBool(_Keys.isGuest) ?? false;
   int get memberSinceYear => _prefs.getInt(_Keys.memberSinceYear) ?? DateTime.now().year;
 
+  // ---------------------------------------------------------------------
+  // Focus time (the FOCUS TIME setter on Home)
+  // ---------------------------------------------------------------------
+
+  /// How long a study session lasts, in minutes. 25 = classic Pomodoro.
+  int get focusMinutes => _prefs.getInt(_Keys.focusMinutes) ?? 25;
+
+  Future<void> setFocusMinutes(int minutes) async {
+    await _prefs.setInt(_Keys.focusMinutes, minutes);
+    _scheduleSync();
+    notifyListeners();
+  }
+
   Future<void> setUsername(String name) async {
     await _prefs.setString(_Keys.username, name);
+    _scheduleSync();
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------
+  // Profile photo (small JPEG, saved as text so it fits in SharedPreferences
+  // and in the Firestore user document — no Firebase Storage needed)
+  // ---------------------------------------------------------------------
+
+  String? _avatarCacheKey;
+  Uint8List? _avatarCache;
+
+  /// The profile photo, or null if none has been chosen.
+  Uint8List? get avatarBytes {
+    final encoded = _prefs.getString(_Keys.avatar) ?? '';
+    if (encoded.isEmpty) return null;
+    if (encoded != _avatarCacheKey) {
+      // Decoding every rebuild would be wasteful, so remember the result.
+      _avatarCacheKey = encoded;
+      try {
+        _avatarCache = base64Decode(encoded);
+      } catch (_) {
+        _avatarCache = null;
+      }
+    }
+    return _avatarCache;
+  }
+
+  /// true = show the photo as chunky pixels to match the game.
+  bool get avatarPixelated => _prefs.getBool(_Keys.avatarPixel) ?? true;
+
+  /// Saves a new photo (or removes it when [bytes] is null) and uploads it
+  /// right away — separately from the regular sync, since it's the one
+  /// big field.
+  Future<void> setAvatar(Uint8List? bytes) async {
+    final encoded = bytes == null ? '' : base64Encode(bytes);
+    await _prefs.setString(_Keys.avatar, encoded);
+    notifyListeners();
+    final cloud = _cloud;
+    if (cloud == null) return;
+    try {
+      await cloud.saveUser({'avatar': encoded}).timeout(const Duration(seconds: 10));
+    } catch (error) {
+      // Firestore keeps the write queued and retries when back online.
+      debugPrint('Avatar upload did not finish: $error');
+    }
+  }
+
+  Future<void> setAvatarPixelated(bool value) async {
+    await _prefs.setBool(_Keys.avatarPixel, value);
     _scheduleSync();
     notifyListeners();
   }

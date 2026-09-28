@@ -1,6 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// The app's name, in ONE place. Change it here and the app title and
+/// "About" text update. The big logo is the KuwagoLogo widget (its O is a
+/// clock), and the name under the icon on the phone is android:label in
+/// android/app/src/main/AndroidManifest.xml.
+class AppInfo {
+  AppInfo._();
+
+  static const name = 'kuwaGO';
+  static const tagline = 'Plant Edition';
+}
+
 /// All the colors from the Figma design in one place.
 /// Change a value here and it updates everywhere in the app.
 class AppColors {

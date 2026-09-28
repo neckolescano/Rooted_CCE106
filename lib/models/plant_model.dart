@@ -55,10 +55,11 @@ class PlantModel extends ChangeNotifier {
   int get level => stage.index + 1;
 
   /// The current stage's still image, e.g. assets/images/plant/stages/grow.png
-  /// There's no separate "wilted" art file — PlantDisplay applies a
-  /// grey/brown tint on top of this same image when isWilted is true,
-  /// so one sprite per stage is all that's needed.
   String get assetPath => species.stageAsset(stage.assetName);
+
+  /// The drooping, dried-out version of the current stage, shown after a
+  /// session is given up (assets/.../wilted/grow.png).
+  String get wiltedAssetPath => species.wiltedAsset(stage.assetName);
 
   /// Only a seed can be swapped for a different kind of plant.
   bool get canChangeSpecies => stage == GrowthStage.seed;

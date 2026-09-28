@@ -12,7 +12,7 @@ import '../widgets/pixel_dialog.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_section_header.dart';
-import '../widgets/pixel_sprite.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/scene_frame.dart';
 import 'login_screen.dart';
 
@@ -68,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showAbout() {
     showPixelMessage(
       context,
-      title: 'Study Buddy',
+      title: AppInfo.name,
       sealIcon: Icons.spa,
       body: Text(
         'A cozy pixel garden where studying grows your world.\n\n'
@@ -241,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const _RowDivider(),
               _SettingRow(
                 icon: Icons.info_outline,
-                title: 'About Study Buddy',
+                title: 'About ${AppInfo.name}',
                 trailing: const Icon(Icons.chevron_right, color: AppColors.panelMedium),
                 onTap: _showAbout,
               ),
@@ -310,24 +310,36 @@ class _CoverAndAvatar extends StatelessWidget {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // Your grown sunflower stands in for a profile picture
-                    // until gardener avatars are drawn.
-                    const PixelPanel(
-                      style: PanelStyle.wood,
-                      padding: EdgeInsets.all(6),
-                      child: PixelPanel(
-                        style: PanelStyle.parchment,
-                        sunken: true,
-                        shadow: false,
-                        padding: EdgeInsets.zero,
-                        child: Center(
-                          child: PixelSprite(
-                            'assets/images/plant/stages/fullgrown.png',
-                            size: 92,
-                            zoom: 1.5,
-                            fallbackIcon: Icons.person,
-                            semanticLabel: 'Your avatar',
+                    // Tap the frame to add / change your profile photo.
+                    // Without one, your grown sunflower stands in.
+                    Semantics(
+                      button: true,
+                      label: 'Change profile photo',
+                      child: GestureDetector(
+                        onTap: () => showAvatarOptions(context),
+                        child: const PixelPanel(
+                          style: PanelStyle.wood,
+                          padding: EdgeInsets.all(6),
+                          child: PixelPanel(
+                            style: PanelStyle.parchment,
+                            sunken: true,
+                            shadow: false,
+                            padding: EdgeInsets.all(2),
+                            child: ClipRect(child: Center(child: ProfileAvatar(size: 92))),
                           ),
+                        ),
+                      ),
+                    ),
+                    // Little camera tag so it's clear the photo can change.
+                    const Positioned(
+                      left: -10,
+                      bottom: -8,
+                      child: IgnorePointer(
+                        child: PixelPanel(
+                          style: PanelStyle.wood,
+                          expand: false,
+                          padding: EdgeInsets.all(5),
+                          child: Icon(Icons.photo_camera, size: 14, color: AppColors.textCream),
                         ),
                       ),
                     ),

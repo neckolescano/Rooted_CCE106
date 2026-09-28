@@ -11,10 +11,11 @@ import '../widgets/background_scene.dart';
 import '../widgets/email_auth_dialog.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
-import '../widgets/pixel_sprite.dart';
+import '../widgets/kuwago_logo.dart';
+import '../widgets/owl_mascot.dart';
 import 'main_shell.dart';
 
-/// The "Study Buddy — Plant Edition" login screen. All three options
+/// The kuwaGO login screen. All three options
 /// now use real Firebase accounts: Google, email (create or sign in),
 /// or an anonymous guest account.
 class LoginScreen extends StatefulWidget {
@@ -184,19 +185,19 @@ class _TitleSign extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 20),
       child: Column(
         children: [
-          const PixelSprite(
-            'assets/images/plant/stages/fullgrown.png',
-            size: 128,
-            semanticLabel: 'Study Buddy sunflower logo',
+          // The owl mascot says hello (tap it!).
+          const OwlMascot(
+            size: 120,
+            messages: [
+              'Hoo! Welcome to the garden.',
+              'Sign in and let\'s grow something!',
+              'Guests are welcome too.',
+            ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('STUDY BUDDY', style: AppTheme.pixelHeading(size: 22)),
-          ),
+          const KuwagoLogo(fontSize: 26),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '★ PLANT EDITION ★',
+            '★ ${AppInfo.tagline.toUpperCase()} ★',
             style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),

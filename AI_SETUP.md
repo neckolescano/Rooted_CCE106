@@ -14,19 +14,42 @@ flutter pub get
 2. Choose **Gemini Developer API** (the free one) and finish the guided steps.
    This also turns on **App Check** protection for it.
 
-## 3. Register your debug token (App Check)
-In debug builds the app proves itself with a "debug token".
-1. Run the app and tap **Generate Study Material** once. It will probably
-   fail the first time — that's expected.
-2. In the terminal / Debug Console, find a line like:
-   `DebugAppCheckProvider: Enter this debug secret into the allow list in the Firebase Console for your project: 123a4567-...`
-3. Copy the token. In the console go to **Security → App Check → Apps**,
-   find your Android app, click **⋮ → Manage debug tokens**, and add it.
-4. Tap **Generate Study Material** again.
+## 3. Register your debug token (App Check) — do this ONCE
+In debug/profile builds the app proves itself with a "debug token".
+This project uses a FIXED token so it survives uninstall/reinstall:
+
+1. Open `app_check.local.json` in the project root (it is git-ignored —
+   never commit or share it) and copy the `APP_CHECK_DEBUG_TOKEN` value.
+2. In the Firebase console go to **Security → App Check → Apps**, find your
+   Android app, click **⋮ → Manage debug tokens → Add debug token**, give it
+   a name (e.g. "my phone") and paste the value. Save.
+3. Run the app with the token:
+   - VS Code: press F5 and pick **kuwaGO** (`.vscode/launch.json` passes it), or
+   - terminal: `flutter run --dart-define-from-file=app_check.local.json`
+4. Tap **Generate Study Material**. The Debug Console should show
+   `[AppCheck] Using the fixed debug token` and `[AI] App Check token OK`.
+
+Lost the file? Make a new one with any UUID (e.g. PowerShell
+`[guid]::NewGuid()`) and register that instead.
 
 If your app isn't listed under App Check → Apps, see "Enforce App Check
 without a production attestation provider (debug provider only)" in
 https://firebase.google.com/docs/ai-logic/app-check
+
+## Separate AI project (if Gemini says "Your project has been denied access")
+Google sometimes restricts Gemini for school/academic accounts. The fix: a
+second, free Firebase project on a PERSONAL Google account, used only for AI.
+Login, Firestore and the garden stay on the main project.
+1. Personal Google account → console.firebase.google.com → Add project
+   (e.g. "kuwago-ai", Google Analytics off).
+2. AI Services → AI Logic → Get started → Gemini Developer API.
+3. Add an Android app, package name `com.example.rooted`, SHA-256 of the
+   debug key. Download its google-services.json and save it as
+   `ai_project/google-services.json` in THIS folder (NOT android/app!).
+4. App Check → register that Android app (Play Integrity, same SHA-256),
+   then ⋮ → Manage debug tokens → add the SAME token as app_check.local.json.
+5. The values from that file go into `lib/firebase_options_ai.dart`.
+   The Debug Console then shows `[AI] Using separate AI project "…"`.
 
 ## Troubleshooting
 - **403 / PERMISSION_DENIED / "App Check"** → step 3 (token not registered yet).

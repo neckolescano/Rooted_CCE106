@@ -151,7 +151,7 @@ class _NotesScreenState extends State<NotesScreen> {
                             Expanded(
                               child: Text(
                                 notes.errorMessage!,
-                                maxLines: 5,
+                                maxLines: 12,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppText.small(color: AppColors.dangerText),
                               ),

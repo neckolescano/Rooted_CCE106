@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "71783852373",
+    "project_id": "kuwago-ai",
+    "storage_bucket": "kuwago-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71783852373:android:3b39ba2c416f23e5b9a7dc",
+        "android_client_info": {
+          "package_name": "com.example.rooted"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9w4NkdV2iU2neF9s9kc3UQNexK89fczw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

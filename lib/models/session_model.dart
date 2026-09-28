@@ -3,16 +3,29 @@ import 'package:flutter/material.dart';
 
 enum SessionStatus { idle, running, paused, completed, failed }
 
-/// Runs the 25-minute Pomodoro countdown and reports back whether the
-/// session finished successfully or was given up on. TimerScreen listens
-/// to this to update the clock, and reacts to completed/failed to
-/// grow or wilt the plant.
+/// Runs the Pomodoro countdown and reports back whether the session
+/// finished successfully or was given up on. TimerScreen listens to this
+/// to update the clock, and reacts to completed/failed to grow or wilt
+/// the plant.
+///
+/// The length is chosen on the Home screen (the FOCUS TIME setter) and
+/// passed to [start].
 class SessionModel extends ChangeNotifier {
-  static const int sessionLengthSeconds = 10; // 25:00, matches the Figma
+  /// Classic Pomodoro length, used until the student picks another.
+  static const int defaultMinutes = 25;
 
-  int secondsLeft = sessionLengthSeconds;
+  /// Length of the current (or next) session, in seconds.
+  int durationSeconds = defaultMinutes * 60;
+
+  int secondsLeft = defaultMinutes * 60;
   SessionStatus status = SessionStatus.idle;
   Timer? _timer;
+
+  /// 0.0 at the start of a session → 1.0 when the timer hits zero.
+  double get progress => durationSeconds == 0 ? 0 : 1 - secondsLeft / durationSeconds;
+
+  /// Seconds actually studied so far this session.
+  int get elapsedSeconds => durationSeconds - secondsLeft;
 
   String get formattedTime {
     final minutes = (secondsLeft ~/ 60).toString().padLeft(2, '0');
@@ -20,8 +33,11 @@ class SessionModel extends ChangeNotifier {
     return '$minutes:$seconds';
   }
 
-  void start() {
-    secondsLeft = sessionLengthSeconds;
+  /// Starts a fresh countdown. [minutes] = the length picked on Home;
+  /// leave it out to reuse the last length.
+  void start({int? minutes}) {
+    if (minutes != null && minutes > 0) durationSeconds = minutes * 60;
+    secondsLeft = durationSeconds;
     status = SessionStatus.running;
     _runTimer();
     notifyListeners();
@@ -65,7 +81,7 @@ class SessionModel extends ChangeNotifier {
   /// Reset back to idle so the Home screen shows "Start Study Session" again.
   void reset() {
     _timer?.cancel();
-    secondsLeft = sessionLengthSeconds;
+    secondsLeft = durationSeconds;
     status = SessionStatus.idle;
     notifyListeners();
   }

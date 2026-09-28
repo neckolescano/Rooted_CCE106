@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/plant_model.dart';
 import '../theme/app_theme.dart';
+import 'owl_mascot.dart';
 import 'pixel_panel.dart';
 import 'plant_display.dart';
 import 'window_zoom.dart';
@@ -17,9 +19,13 @@ import 'window_zoom.dart';
 /// Later, when you draw greenhouse_bg / greenhouse_mid / greenhouse_fg,
 /// they replace the code-drawn wall and window here.
 class GreenhouseScene extends StatelessWidget {
-  const GreenhouseScene({super.key, required this.plant, this.windowKey});
+  const GreenhouseScene({super.key, required this.plant, this.windowKey, this.owlMessages});
 
   final PlantModel plant;
+
+  /// If given, kuwago the owl stands on the windowsill next to the plant
+  /// and says these (in order) when tapped.
+  final List<String>? owlMessages;
 
   /// Put on the window so the Home screen can find where it is on screen
   /// (the Start Study Session zoom flies into it).
@@ -71,6 +77,13 @@ class GreenhouseScene extends StatelessWidget {
             // extra so the soil mound sinks into the planter.
             final plantBottom = planterTop + plantSize * 0.22;
             final plantTop = plantBottom - plantSize;
+
+            // kuwago stands on the sill to the right of the planter
+            // (72 dp = 3× the 24-px art; 48 on small phones).
+            final owlSize = plantSize >= 160 ? 72.0 : 48.0;
+            final owlLeft = max((w + planterWidth) / 2 + 2, windowRect.right - owlSize + 8);
+            // The owl's feet are at 21/24 of its height — stand them on the sill.
+            final owlTop = sillTop - owlSize * 21 / 24 + 1;
             // The plant is cut off just below the planter's top edge, so
             // when it ducks down it disappears INTO the planter instead of
             // showing through underneath it.
@@ -143,6 +156,23 @@ class GreenhouseScene extends StatelessWidget {
                       height: _planterHeight,
                       child: const _Planter(),
                     ),
+                    if (owlMessages != null)
+                      Positioned(
+                        left: owlLeft,
+                        top: owlTop,
+                        width: owlSize,
+                        height: owlSize,
+                        child: OwlMascot(
+                          size: owlSize,
+                          perch: false,
+                          wander: true,
+                          floatingBubble: true,
+                          messages: owlMessages!,
+                          // Cheers as the window swings open for a session.
+                          cheering: open.value > 0.01,
+                          cheerLine: "Let's go!",
+                        ),
+                      ),
                   ],
                 );
               },

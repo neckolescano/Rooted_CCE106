@@ -5,6 +5,7 @@ import '../models/plant_catalog.dart';
 import '../models/plant_model.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/focus_time_setter.dart';
 import '../widgets/greenhouse_scene.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
@@ -49,6 +50,30 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  /// What kuwago says when tapped on Home — about YOUR garden right now,
+  /// in this order (then it loops).
+  List<String> _owlLines(PlantModel plant, StorageService storage, int completedSessions) {
+    final name = plant.species.name;
+    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions)).length;
+    return [
+      if (plant.isWilted)
+        'Oh no, your $name wilted… one session will perk it up!'
+      else
+        switch (plant.stage) {
+          GrowthStage.seed => "A fresh $name seed! Tap Start when you're ready.",
+          GrowthStage.sprout => 'Look, your $name sprouted!',
+          GrowthStage.grow => 'Your $name is getting leafy!',
+          GrowthStage.bloom => 'One more session and your $name is fully grown!',
+          GrowthStage.fullGrown => 'Wow, look at it bloom!',
+        },
+      'Focus time is ${FocusTimeSetter.label(storage.focusMinutes)}. You got this!',
+      if (storage.streak >= 2) '${storage.streak} sessions in a row! Hoo-ray!' else 'Hoo! Ready to study?',
+      if (plant.canChangeSpecies && choices > 1) 'Psst… tap the seed tag to plant something new.',
+      'Tip: tap NOTES during a session to jot things down.',
+      'Stay cozy, stay curious.',
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final plant = context.watch<PlantModel>();
@@ -70,7 +95,13 @@ class HomeScreen extends StatelessWidget {
           Expanded(
             child: Stack(
               children: [
-                Positioned.fill(child: GreenhouseScene(plant: plant, windowKey: _windowKey)),
+                Positioned.fill(
+                  child: GreenhouseScene(
+                    plant: plant,
+                    windowKey: _windowKey,
+                    owlMessages: _owlLines(plant, storage, progress.completedSessions),
+                  ),
+                ),
                 // Seed packet tag: which plant is planted. Only a seed can
                 // be swapped, so it's tappable only before the first
                 // session of a new plant.
@@ -90,6 +121,9 @@ class HomeScreen extends StatelessWidget {
             textAlign: TextAlign.center,
             style: AppTheme.body(size: 13, weight: FontWeight.w600),
           ),
+          const SizedBox(height: AppSpacing.md),
+          // How long the session will be — the Timer counts down this.
+          const FocusTimeSetter(),
           const SizedBox(height: AppSpacing.md),
           PixelButton(
             label: 'Start Study Session',
