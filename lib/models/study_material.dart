@@ -34,14 +34,35 @@ class StudyQuestion {
 
   factory StudyQuestion.fromJson(Map<String, dynamic> json) {
     final rawChoices = json['choices'];
+    final choices = rawChoices is List ? rawChoices.map((e) => e.toString()).toList() : null;
     return StudyQuestion(
       question: json['question']?.toString() ?? '',
       type: json['type']?.toString() ?? 'short_answer',
-      answer: json['answer']?.toString() ?? '',
-      choices: rawChoices is List ? rawChoices.map((e) => e.toString()).toList() : null,
+      answer: _matchAnswerToChoice(json['answer']?.toString() ?? '', choices),
+      choices: choices,
       explanation: json['explanation']?.toString(),
     );
   }
+}
+
+/// The AI sometimes answers a multiple choice question with "B" or with
+/// slightly different capitalisation instead of the exact choice text,
+/// which would make a correct pick look wrong. This snaps the answer to
+/// the matching choice when it can.
+String _matchAnswerToChoice(String answer, List<String>? choices) {
+  if (choices == null || choices.isEmpty || choices.contains(answer)) return answer;
+
+  final trimmed = answer.trim();
+  for (final choice in choices) {
+    if (choice.trim().toLowerCase() == trimmed.toLowerCase()) return choice;
+  }
+
+  final letter = RegExp(r'^\(?([A-Za-z])[\).:]?$').firstMatch(trimmed);
+  if (letter != null) {
+    final index = letter.group(1)!.toUpperCase().codeUnitAt(0) - 'A'.codeUnitAt(0);
+    if (index >= 0 && index < choices.length) return choices[index];
+  }
+  return answer;
 }
 
 /// The full set of AI-generated material for one batch of notes.

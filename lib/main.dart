@@ -1,5 +1,7 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
@@ -21,6 +23,17 @@ Future<void> main() async {
     // Most likely `flutterfire configure` hasn't been run yet.
     runApp(SetupNeededApp(details: error.toString()));
     return;
+  }
+
+  // App Check proves to Firebase that AI requests come from your real
+  // app. While developing, the "debug" provider is used (you register
+  // its token once in the Firebase console — see AI_SETUP.md).
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+    );
+  } catch (error) {
+    debugPrint('App Check could not start: $error');
   }
 
   final storage = await StorageService.create();
