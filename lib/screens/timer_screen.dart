@@ -62,7 +62,9 @@ class _TimerScreenState extends State<TimerScreen> {
 
     session.giveUp();
     plant.wilt();
-    await storage.recordFailedSession();
+    await storage.recordFailedSession(
+      elapsedSeconds: SessionModel.sessionLengthSeconds - session.secondsLeft,
+    );
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
 
     if (mounted) Navigator.of(context).pop();
@@ -91,7 +93,7 @@ class _TimerScreenState extends State<TimerScreen> {
     final storage = context.read<StorageService>();
 
     plant.grow();
-    await storage.recordCompletedSession();
+    await storage.recordCompletedSession(durationSeconds: SessionModel.sessionLengthSeconds);
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
 
     // This covers BOTH cases: the plant just grew into its final stage

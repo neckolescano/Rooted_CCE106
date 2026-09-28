@@ -40,6 +40,16 @@ class NotesModel extends ChangeNotifier {
     }
   }
 
+  /// Wipes everything — used when someone signs out so the next person
+  /// to log in doesn't see this user's notes or study material.
+  void reset() {
+    text = '';
+    material = null;
+    errorMessage = null;
+    isGenerating = false;
+    notifyListeners();
+  }
+
   void clearError() {
     errorMessage = null;
     notifyListeners();

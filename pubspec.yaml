@@ -12,6 +12,9 @@ dependencies:
   provider: ^6.1.2       # simple state management (ChangeNotifier)
   shared_preferences: ^2.2.3  # local storage for streak / sessions / plant progress
   google_fonts: ^6.2.1   # for the pixel-style heading font
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
 
 dev_dependencies:
   flutter_test:

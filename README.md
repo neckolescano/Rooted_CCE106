@@ -1,5 +1,9 @@
 # Rooted — Setup Guide
 
+> **Accounts + database:** the app now uses Firebase (login, profile,
+> stats, plant progress, notes and a session log are saved per account).
+> Before it will run, follow **FIREBASE_SETUP.md**.
+
 ## 1. Extract & open
 Unzip this folder anywhere, then open it in VS Code / Android Studio as a
 Flutter project (it already has a `pubspec.yaml`, so your IDE should
