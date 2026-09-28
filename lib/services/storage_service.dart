@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/study_options.dart';
 import 'cloud_service.dart';
 
 /// Keeps all the SharedPreferences key names in one place so we never
@@ -22,11 +23,13 @@ class _Keys {
   static const avatar = 'avatar_base64';
   static const avatarPixel = 'avatar_pixel';
   static const focusMinutes = 'focus_minutes';
+  static const studyOptions = 'study_options';
+  static const cardDesign = 'card_design';
 
   static const all = [
     streak, totalSessions, plantStage, plantWilted, username,
     harvestedPlants, notesText, email, isGuest, memberSinceYear,
-    plantSpecies, harvestLog, avatar, avatarPixel, focusMinutes,
+    plantSpecies, harvestLog, avatar, avatarPixel, focusMinutes, studyOptions, cardDesign,
   ];
 }
 
@@ -129,6 +132,8 @@ class StorageService extends ChangeNotifier {
     await _prefs.setStringList(_Keys.harvestLog, log is List ? log.map((e) => e.toString()).toList() : const []);
     await _prefs.setString(_Keys.avatar, data['avatar']?.toString() ?? '');
     await _prefs.setBool(_Keys.avatarPixel, data['avatarPixel'] != false);
+    final design = data['cardDesign'];
+    if (design is String && design.isNotEmpty) await _prefs.setString(_Keys.cardDesign, design);
     final minutes = data['focusMinutes'];
     if (minutes is num && minutes > 0) await _prefs.setInt(_Keys.focusMinutes, minutes.toInt());
 
@@ -160,6 +165,7 @@ class StorageService extends ChangeNotifier {
         'harvestLog': harvestLog,
         'avatarPixel': avatarPixelated,
         'focusMinutes': focusMinutes,
+        'cardDesign': cardDesign,
         // The photo itself is NOT in here on purpose — it's ~30 KB, so it's
         // only uploaded when it changes (see setAvatar), not on every sync.
         'notes': savedNotes,
@@ -291,6 +297,37 @@ class StorageService extends ChangeNotifier {
 
   Future<void> setFocusMinutes(int minutes) async {
     await _prefs.setInt(_Keys.focusMinutes, minutes);
+    _scheduleSync();
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------
+  // Study options (the "Grow your study patch" scroll) — this phone only
+  // ---------------------------------------------------------------------
+
+  StudyOptions get studyOptions {
+    final raw = _prefs.getString(_Keys.studyOptions);
+    if (raw == null) return const StudyOptions();
+    try {
+      return StudyOptions.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+    } catch (_) {
+      return const StudyOptions();
+    }
+  }
+
+  Future<void> setStudyOptions(StudyOptions options) async {
+    await _prefs.setString(_Keys.studyOptions, jsonEncode(options.toJson()));
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------
+  // Player Card design (unlocked by quests — see models/card_designs.dart)
+  // ---------------------------------------------------------------------
+
+  String get cardDesign => _prefs.getString(_Keys.cardDesign) ?? 'meadow';
+
+  Future<void> setCardDesign(String id) async {
+    await _prefs.setString(_Keys.cardDesign, id);
     _scheduleSync();
     notifyListeners();
   }

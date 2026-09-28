@@ -14,6 +14,8 @@ class SceneFrame extends StatelessWidget {
     required this.children,
     this.asset = 'assets/images/backgrounds/garden_meadow.png',
     this.imageAlignment = Alignment.center,
+    this.tint,
+    this.golden = false,
   });
 
   final List<Widget> children;
@@ -23,10 +25,33 @@ class SceneFrame extends StatelessWidget {
   /// y = 1 is the flowers at the bottom.
   final Alignment imageAlignment;
 
+  /// Optional colour wash over the picture (sunset orange, night blue…).
+  final Color? tint;
+
+  /// Gold picture frame instead of wood.
+  final bool golden;
+
   @override
   Widget build(BuildContext context) {
+    Widget picture = Image.asset(
+      asset,
+      fit: BoxFit.cover,
+      alignment: imageAlignment,
+      // Shown smaller than the source file, so light smoothing looks
+      // cleaner than dropped pixels.
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) => const ColoredBox(color: Color(0xFFAFD8C9)),
+    );
+    final wash = tint;
+    if (wash != null) {
+      // "modulate" multiplies the colours: keeps all the pixel detail,
+      // just shifts the mood (e.g. blue = night).
+      picture = ColorFiltered(colorFilter: ColorFilter.mode(wash, BlendMode.modulate), child: picture);
+    }
+
     return PixelPanel(
       style: PanelStyle.wood,
+      backgroundColor: golden ? const Color(0xFFD9A93A) : null,
       padding: const EdgeInsets.all(6),
       child: DecoratedBox(
         // Dark inner edge between the frame and the picture.
@@ -38,16 +63,7 @@ class SceneFrame extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(
-                asset,
-                fit: BoxFit.cover,
-                alignment: imageAlignment,
-                // Shown smaller than the source file, so light smoothing
-                // looks cleaner than dropped pixels.
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (context, error, stackTrace) =>
-                    const ColoredBox(color: Color(0xFFAFD8C9)),
-              ),
+              picture,
               ...children,
             ],
           ),

@@ -137,9 +137,45 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
     );
   }
 
+  /// Identification / short answer: type it and tap Check, or just
+  /// reveal the answer.
   List<Widget> _buildShortAnswer(StudyQuestion q) {
-    if (!_revealed) {
-      return [
+    final result = _typedCorrect;
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _typed,
+              enabled: !_revealed,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _check(q),
+              style: AppTheme.body(size: 14, weight: FontWeight.w700),
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: 'Type your answer…',
+                filled: true,
+                fillColor: Color(0xFFFBEBD3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: AppColors.panelDark, width: AppBorders.width),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: AppColors.panelDark, width: AppBorders.width),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          if (!_revealed)
+            TextButton(
+              onPressed: () => _check(q),
+              child: Text('Check', style: AppText.small(color: AppColors.panelMedium, weight: FontWeight.w900)),
+            ),
+        ],
+      ),
+      if (!_revealed)
         Semantics(
           button: true,
           child: GestureDetector(
@@ -148,16 +184,55 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
                 'Reveal answer',
-                style: AppText.small(color: AppColors.panelMedium, weight: FontWeight.w900)
+                style: AppText.small(color: AppColors.textMuted, weight: FontWeight.w800)
                     .copyWith(decoration: TextDecoration.underline),
               ),
             ),
           ),
-        ),
-      ];
-    }
-    return [
-      Text(q.answer, style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800)),
+        )
+      else ...[
+        const SizedBox(height: AppSpacing.sm),
+        if (result != null)
+          Text(
+            result ? 'CORRECT!  Your knowledge is growing!' : "NOT QUITE!  Let's learn this one again.",
+            style: AppText.small(color: result ? AppColors.greenDeep : AppColors.dangerText, weight: FontWeight.w900),
+          ),
+        Text('Answer: ${q.answer}', style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800)),
+      ],
     ];
+  }
+
+  final _typed = TextEditingController();
+
+  /// null = not checked (just revealed), true/false = typed answer result.
+  bool? _typedCorrect;
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  void _check(StudyQuestion q) {
+    if (_typed.text.trim().isEmpty) return;
+    setState(() {
+      _typedCorrect = _matches(_typed.text, q.answer);
+      _revealed = true;
+    });
+  }
+
+  /// Forgiving match: ignores case, punctuation, extra spaces and "the/a/an",
+  /// and accepts it if either contains the other ("chloroplast" ≈
+  /// "the chloroplasts"), since typed answers are rarely word-perfect.
+  static bool _matches(String typed, String answer) {
+    String clean(String s) => s
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\b(the|a|an)\b'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final t = clean(typed), a = clean(answer);
+    if (t.isEmpty || a.isEmpty) return false;
+    return t == a || (t.length >= 3 && a.contains(t)) || (a.length >= 3 && t.contains(a));
   }
 }

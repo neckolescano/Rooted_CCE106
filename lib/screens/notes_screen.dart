@@ -9,6 +9,7 @@ import '../widgets/desk_background.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
+import '../widgets/study_options_dialog.dart';
 import 'study_material_screen.dart';
 
 /// The Study Journal, reached from the Timer screen. The Pomodoro
@@ -37,8 +38,11 @@ class _NotesScreenState extends State<NotesScreen> {
     super.dispose();
   }
 
-  Future<void> _generate() async {
+  /// [askOptions] = show the "Grow your study patch" scroll first.
+  /// "Try again" skips it and reuses the last choices.
+  Future<void> _generate({bool askOptions = true}) async {
     final notes = context.read<NotesModel>();
+    final storage = context.read<StorageService>();
 
     if (notes.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,7 +52,16 @@ class _NotesScreenState extends State<NotesScreen> {
     }
 
     FocusScope.of(context).unfocus(); // drop the keyboard while it works
-    await notes.generateStudyMaterial(AiService());
+
+    var options = storage.studyOptions;
+    if (askOptions) {
+      final picked = await showStudyOptions(context, options);
+      if (picked == null || !mounted) return; // "Not now"
+      options = picked;
+      await storage.setStudyOptions(picked); // remembered for next time
+    }
+
+    await notes.generateStudyMaterial(AiService(), options);
     if (!mounted) return;
 
     if (notes.material != null) {
@@ -163,7 +176,7 @@ class _NotesScreenState extends State<NotesScreen> {
                           label: 'Try Again',
                           tone: ButtonTone.secondary,
                           height: 44,
-                          onPressed: _generate,
+                          onPressed: () => _generate(askOptions: false),
                         ),
                       ],
                     ),

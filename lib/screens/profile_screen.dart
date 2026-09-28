@@ -8,12 +8,14 @@ import '../models/session_model.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../models/card_designs.dart';
+import '../widgets/card_cover.dart';
+import '../widgets/pixel_button.dart';
 import '../widgets/pixel_dialog.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_section_header.dart';
 import '../widgets/profile_avatar.dart';
-import '../widgets/scene_frame.dart';
 import 'login_screen.dart';
 
 /// The player's profile, laid out like a game character sheet: a meadow
@@ -63,6 +65,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
+  }
+
+  /// Scroll with a text box to rename the gardener (2–20 characters).
+  Future<void> _editName() async {
+    final storage = context.read<StorageService>();
+    final controller = TextEditingController(text: storage.username);
+    final newName = await showDialog<String>(
+      context: context,
+      barrierColor: AppColors.overlay,
+      builder: (dialogContext) => PixelDialog(
+        title: 'Your gardener name',
+        sealIcon: Icons.edit,
+        body: TextField(
+          controller: controller,
+          maxLength: 20,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          style: AppTheme.body(size: 15, weight: FontWeight.w800),
+          decoration: const InputDecoration(filled: true, fillColor: Color(0xFFFBEBD3)),
+        ),
+        actions: [
+          PixelButton(
+            label: 'Save',
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.length >= 2) Navigator.of(dialogContext).pop(name);
+            },
+          ),
+          PixelButton(
+            label: 'Cancel',
+            tone: ButtonTone.secondary,
+            onPressed: () => Navigator.of(dialogContext).pop(),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName != null && mounted) await storage.setUsername(newName);
   }
 
   void _showAbout() {
@@ -128,12 +168,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         _CoverAndAvatar(level: progress.level),
         const SizedBox(height: AppSpacing.md),
-        Text(
-          storage.username,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTheme.pixelHeading(size: 15),
+        // Tap the name to change it.
+        GestureDetector(
+          onTap: _editName,
+          child: Text(
+            '${storage.username} ✎',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTheme.pixelHeading(size: 15),
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -234,9 +278,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const _RowDivider(),
               _SettingRow(
-                icon: Icons.palette,
-                title: 'Cottage Parchment',
-                trailing: Text('ACTIVE', style: AppText.small(color: AppColors.greenDeep, weight: FontWeight.w900)),
+                icon: Icons.edit,
+                title: 'Gardener name',
+                trailing: Text(storage.username, style: AppText.small(color: AppColors.greenDeep, weight: FontWeight.w900)),
+                onTap: _editName,
               ),
               const _RowDivider(),
               _SettingRow(
@@ -283,8 +328,8 @@ class _CoverAndAvatar extends StatelessWidget {
             right: 0,
             top: 0,
             height: _coverHeight,
-            child: SceneFrame(
-              imageAlignment: const Alignment(0.6, 0.0),
+            child: CardCover(
+              design: cardDesignById(context.watch<StorageService>().cardDesign),
               children: [
                 Positioned(
                   left: 8,

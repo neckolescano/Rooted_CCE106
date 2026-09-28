@@ -57,6 +57,26 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
                 const SizedBox(height: AppSpacing.md),
                 const CompactTimerHeader(),
                 const SizedBox(height: AppSpacing.md),
+                if (material?.offline ?? false) ...[
+                  // Made by OfflineStudyMaker because the AI was busy/slow.
+                  PixelPanel(
+                    style: PanelStyle.parchment,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cloud_off, size: 18, color: AppColors.panelMedium),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'Made offline — the study AI was busy. Generate again later for smarter questions.',
+                            style: AppText.small(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 Row(
                   children: [
                     Expanded(

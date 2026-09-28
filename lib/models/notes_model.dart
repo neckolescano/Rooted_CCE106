@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/ai_service.dart';
 import 'study_material.dart';
+import 'study_options.dart';
 
 /// Holds the student's current notes and whatever study material has
 /// been generated from them. Lives at the app root (like PlantModel and
@@ -22,7 +23,7 @@ class NotesModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> generateStudyMaterial(AiService service) async {
+  Future<void> generateStudyMaterial(AiService service, StudyOptions options) async {
     if (text.trim().isEmpty || isGenerating) return;
 
     isGenerating = true;
@@ -30,7 +31,7 @@ class NotesModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      material = await service.generateStudyMaterial(text);
+      material = await service.generateStudyMaterial(text, options);
     } catch (error) {
       errorMessage = error.toString();
       material = null;
