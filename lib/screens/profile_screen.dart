@@ -10,6 +10,7 @@ import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../models/card_designs.dart';
 import '../widgets/card_cover.dart';
+import '../widgets/card_design_shelf.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_dialog.dart';
 import '../widgets/pixel_panel.dart';
@@ -162,6 +163,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       gardenLevel: progress.level,
     );
     final earned = badges.where((b) => b.earned).length;
+    // What the Player Card design quests are checked against.
+    final questStats = QuestStats(
+      completedSessions: progress.completedSessions,
+      harvestedPlants: storage.harvestedPlants,
+      streak: storage.streak,
+      gardenLevel: progress.level,
+      grownBySpecies: {
+        for (final id in storage.harvestLog) id: storage.harvestedCountOf(id),
+      },
+    );
+    final designsUnlocked = cardDesigns.where((d) => d.isUnlocked(questStats)).length;
 
     return ListView(
       padding: AppSpacing.screen,
@@ -259,6 +271,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ],
         ),
+        const SizedBox(height: AppSpacing.xl),
+        // Player Card designs: scroll sideways, tap one to preview/equip.
+        PixelSectionHeader(
+          'Card designs',
+          trailing: Text(
+            '$designsUnlocked / ${cardDesigns.length} unlocked',
+            style: AppText.small(color: AppColors.textMuted),
+          ),
+        ),
+        CardDesignShelf(stats: questStats),
         const SizedBox(height: AppSpacing.xl),
         const PixelSectionHeader('Cozy settings'),
         PixelPanel(

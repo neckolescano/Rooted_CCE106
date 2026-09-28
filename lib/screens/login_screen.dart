@@ -11,8 +11,8 @@ import '../widgets/background_scene.dart';
 import '../widgets/email_auth_dialog.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
-import '../widgets/kuwago_logo.dart';
-import '../widgets/owl_mascot.dart';
+import '../services/intro_cue.dart';
+import '../widgets/kuwago_lockup.dart';
 import 'main_shell.dart';
 
 /// The kuwaGO login screen. All three options
@@ -25,10 +25,54 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   // `late` = only created on the first button tap, not when the screen opens.
   late final _auth = AuthService();
   bool _busy = false;
+
+  // Entrance: the sign unfurls under the kuwaGO lockup, then the buttons
+  // rise in one by one. On app start it waits for the opening to reveal
+  // this page (the opening flies the lockup onto the sign).
+  late final AnimationController _entrance =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void initState() {
+    super.initState();
+    if (IntroCue.stage.value == IntroStage.covering) {
+      IntroCue.stage.addListener(_startWhenRevealed);
+    } else {
+      _entrance.forward();
+    }
+  }
+
+  void _startWhenRevealed() {
+    if (IntroCue.stage.value == IntroStage.covering) return;
+    IntroCue.stage.removeListener(_startWhenRevealed);
+    if (mounted) _entrance.forward();
+  }
+
+  @override
+  void dispose() {
+    IntroCue.stage.removeListener(_startWhenRevealed);
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  /// Slides [child] up into place between [from] and [to] of the entrance.
+  Widget _rise(double from, double to, Widget child) {
+    return AnimatedBuilder(
+      animation: _entrance,
+      child: child,
+      builder: (context, child) {
+        final t = Curves.easeOutBack.transform(((_entrance.value - from) / (to - from)).clamp(0.0, 1.0));
+        return Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Transform.translate(offset: Offset(0, 36 * (1 - t)), child: child),
+        );
+      },
+    );
+  }
 
   /// Runs a sign-in, then loads that user's saved data and enters the app.
   Future<void> _run(Future<User> Function() signIn, {String? username}) async {
@@ -109,21 +153,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   children: [
                     const Spacer(flex: 2),
-                    const _TitleSign(),
+                    _TitleSign(entrance: _entrance),
                     const Spacer(flex: 3),
-                    PixelButton(
+                    _rise(0.40, 0.75, PixelButton(
                       label: 'Continue with Google',
                       icon: Icons.g_mobiledata,
                       onPressed: () => _run(_auth.signInWithGoogle),
-                    ),
+                    )),
                     const SizedBox(height: AppSpacing.md),
-                    PixelButton(
+                    _rise(0.50, 0.85, PixelButton(
                       label: 'Create Cozy Account',
                       onPressed: _emailFlow,
-                    ),
+                    )),
                     const SizedBox(height: AppSpacing.md),
                     // On a dark plank so it stays readable over the grass.
-                    Semantics(
+                    _rise(0.60, 0.95, Semantics(
                       button: true,
                       label: 'Play as guest trainee',
                       excludeSemantics: true,
@@ -151,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
@@ -173,41 +217,82 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Parchment sign with the grown sunflower as the logo, the title and
-/// the tagline — sits in the sky above the meadow.
+/// The parchment sign in the sky: the kuwaGO lockup (kuwago perched on the
+/// clock O — the same picture as the launch splash), the tagline and a
+/// line about the app. The sign itself unfurls downward from under the
+/// lockup; the lockup never moves, so the opening can land on it exactly.
 class _TitleSign extends StatelessWidget {
-  const _TitleSign();
+  const _TitleSign({required this.entrance});
+
+  final Animation<double> entrance;
+
+  static double _seg(double v, double a, double b, [Curve curve = Curves.linear]) =>
+      curve.transform(((v - a) / (b - a)).clamp(0.0, 1.0));
 
   @override
   Widget build(BuildContext context) {
-    return PixelPanel(
-      style: PanelStyle.parchment,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 20),
-      child: Column(
-        children: [
-          // The owl mascot says hello (tap it!).
-          const OwlMascot(
-            size: 120,
-            messages: [
-              'Hoo! Welcome to the garden.',
-              'Sign in and let\'s grow something!',
-              'Guests are welcome too.',
-            ],
-          ),
-          const KuwagoLogo(fontSize: 26),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '★ ${AppInfo.tagline.toUpperCase()} ★',
-            style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Grow your virtual forest with every focus block.',
-            textAlign: TextAlign.center,
-            style: AppTheme.body(size: 13, weight: FontWeight.w600),
-          ),
-        ],
-      ),
+    return AnimatedBuilder(
+      animation: entrance,
+      builder: (context, _) {
+        final e = entrance.value;
+        final unfurl = _seg(e, 0, 0.38, Curves.easeOutBack);
+        final words = _seg(e, 0.22, 0.55);
+        return Stack(
+          children: [
+            // The board, unrolling from the top.
+            Positioned.fill(
+              child: Opacity(
+                opacity: _seg(e, 0, 0.12),
+                child: Transform.scale(
+                  scaleY: unfurl.clamp(0.0, 1.2),
+                  alignment: Alignment.topCenter,
+                  child: const PixelPanel(style: PanelStyle.parchment, child: SizedBox.expand()),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 20),
+              child: Column(
+                children: [
+                  // Hidden until the opening has flown its copy in here.
+                  ValueListenableBuilder<IntroStage>(
+                    valueListenable: IntroCue.stage,
+                    builder: (context, stage, child) =>
+                        Opacity(opacity: stage == IntroStage.done ? 1 : 0, child: child),
+                    // A third bigger than on the splash (2 dp per pixel);
+                    // the opening grows it to this size as it lands.
+                    child: KeyedSubtree(
+                      key: IntroCue.loginLockupKey,
+                      child: SizedBox.fromSize(
+                        size: KuwagoLockup.size * (4 / 3),
+                        child: const FittedBox(child: LiveKuwagoLockup()),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Opacity(
+                    opacity: words,
+                    child: Column(
+                      children: [
+                        Text(
+                          '★ ${AppInfo.tagline.toUpperCase()} ★',
+                          style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Grow your virtual forest with every focus block.',
+                          textAlign: TextAlign.center,
+                          style: AppTheme.body(size: 13, weight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -12,18 +12,23 @@ import 'screens/loading_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/ai_firebase.dart';
+import 'services/intro_cue.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Show the grass loading screen IMMEDIATELY, then do the slow start-up
-  // work (Firebase, loading the garden) behind it. Before, all of that
+  // Show kuwago's opening IMMEDIATELY, then do the slow start-up work
+  // (Firebase, loading the garden) behind it. Before, all of that
   // happened before anything was drawn — that was the black screen.
   runApp(const BootApp());
 }
 
-/// Shows [LoadingScreen] while [_boot] runs, then fades into the real app.
+/// The opening (the kuwaGO clock) on top; the real app is built underneath
+/// as soon as start-up is done. The clock dings, a circle opens out of the
+/// O onto the app, and the lockup / kuwago carry on into the login or home
+/// page — after which the opening is removed. The app itself is never
+/// rebuilt or moved, so nothing flickers.
 class BootApp extends StatefulWidget {
   const BootApp({super.key});
 
@@ -32,38 +37,28 @@ class BootApp extends StatefulWidget {
 }
 
 class _BootAppState extends State<BootApp> {
-  double _progress = 0.05;
-  Widget? _app; // the real app, once it's ready
-
-  /// Even on a fast phone, keep the loading screen up this long so the
-  /// grass animation is seen instead of flashing past.
-  static const _minimumShow = Duration(milliseconds: 1200);
+  Widget? _app; // the real app, once start-up has finished
+  bool _introGone = false;
 
   @override
   void initState() {
     super.initState();
-    _start();
+    // The first page waits for the opening before showing the pieces it
+    // carries in (see IntroCue).
+    IntroCue.stage.value = IntroStage.covering;
+    // Let the opening get its first frames out smoothly before the heavy
+    // start-up work (Firebase, loading the garden) begins.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 150), _start);
+    });
   }
 
   Future<void> _start() async {
-    final startedAt = DateTime.now();
     final app = await _boot();
-    final remaining = _minimumShow - DateTime.now().difference(startedAt);
-    if (remaining > Duration.zero) await Future<void>.delayed(remaining);
-    if (!mounted) return;
-    _step(1);
-    // Let the grass reach the end and the flower fully bloom.
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    setState(() => _app = app);
+    if (mounted) setState(() => _app = app);
   }
 
-  void _step(double progress) {
-    if (mounted) setState(() => _progress = progress);
-  }
-
-  /// Everything that used to run before runApp. Each step nudges the
-  /// loading bar forward.
+  /// Everything that used to run before runApp (behind the opening).
   Future<Widget> _boot() async {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -71,7 +66,6 @@ class _BootAppState extends State<BootApp> {
       // Most likely `flutterfire configure` hasn't been run yet.
       return SetupNeededApp(details: error.toString());
     }
-    _step(0.3);
 
     // App Check proves to Firebase that AI requests come from your real
     // app. While developing (debug + profile builds) the "debug" provider
@@ -95,12 +89,10 @@ class _BootAppState extends State<BootApp> {
     }
     // The separate Firebase project used only for AI (if configured).
     await AiFirebase.init(appCheckProvider);
-    _step(0.45);
 
     final storage = await StorageService.create();
     final plant = PlantModel();
     final notes = NotesModel();
-    _step(0.6);
 
     // If someone was already signed in last time, load their data from
     // the database and drop them straight into the app.
@@ -119,7 +111,6 @@ class _BootAppState extends State<BootApp> {
       );
       notes.loadFrom(storage.savedNotes);
     }
-    _step(0.9);
 
     return RootedApp(
       key: const ValueKey('app'),
@@ -132,15 +123,22 @@ class _BootAppState extends State<BootApp> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 450),
-      child: _app ??
-          MaterialApp(
-            key: const ValueKey('loading'),
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.theme,
-            home: LoadingScreen(progress: _progress),
-          ),
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_app != null) _app!,
+          if (!_introGone)
+            LoadingScreen(
+              appReady: _app != null,
+              onRevealed: () => setState(() {
+                _introGone = true;
+                IntroCue.stage.value = IntroStage.done; // same frame: the real pieces appear as the flyers vanish
+              }),
+            ),
+        ],
+      ),
     );
   }
 }

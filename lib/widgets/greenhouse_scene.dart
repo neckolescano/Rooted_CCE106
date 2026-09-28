@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/plant_model.dart';
 import '../theme/app_theme.dart';
+import '../services/intro_cue.dart';
 import 'owl_mascot.dart';
 import 'pixel_panel.dart';
 import 'plant_display.dart';
@@ -162,15 +163,25 @@ class GreenhouseScene extends StatelessWidget {
                         top: owlTop,
                         width: owlSize,
                         height: owlSize,
-                        child: OwlMascot(
-                          size: owlSize,
-                          perch: false,
-                          wander: true,
-                          floatingBubble: true,
-                          messages: owlMessages!,
-                          // Cheers as the window swings open for a session.
-                          cheering: open.value > 0.01,
-                          cheerLine: "Let's go!",
+                        // On app start the opening flies kuwago in to this
+                        // exact spot, so it stays hidden until it lands.
+                        child: KeyedSubtree(
+                          key: IntroCue.homeOwlKey,
+                          child: ValueListenableBuilder<IntroStage>(
+                            valueListenable: IntroCue.stage,
+                            builder: (context, stage, child) =>
+                                Opacity(opacity: stage == IntroStage.done ? 1 : 0, child: child),
+                            child: OwlMascot(
+                              size: owlSize,
+                              perch: false,
+                              wander: true,
+                              floatingBubble: true,
+                              messages: owlMessages!,
+                              // Cheers as the window swings open for a session.
+                              cheering: open.value > 0.01,
+                              cheerLine: "Let's go!",
+                            ),
+                          ),
                         ),
                       ),
                   ],

@@ -15,6 +15,8 @@ class OwlSprite extends StatelessWidget {
     this.blink = false,
     this.wingsUp = false,
     this.perch = true,
+    this.closeLeft = false,
+    this.closeRight = false,
   });
 
   final double size;
@@ -23,11 +25,22 @@ class OwlSprite extends StatelessWidget {
   final bool wingsUp;
   final bool perch;
 
+  /// Close just one eye (as seen on screen).
+  final bool closeLeft;
+  final bool closeRight;
+
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size.square(size),
-      painter: _OwlPainter(owlRows(look: look, blink: blink, wingsUp: wingsUp, perch: perch)),
+      painter: _OwlPainter(owlRows(
+        look: look,
+        blink: blink,
+        wingsUp: wingsUp,
+        perch: perch,
+        closeLeft: closeLeft,
+        closeRight: closeRight,
+      )),
     );
   }
 }

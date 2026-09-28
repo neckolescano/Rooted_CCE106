@@ -78,21 +78,35 @@ const _eyeLefts = [5, 15]; // x where each 4-px-wide eye starts
 ///   [wingsUp] wings raised (flap / cheer)
 ///   [perch]   draw its branch; false = feet only (to stand on a ledge),
 ///             the bottom 3 rows are then empty
-List<String> owlRows({int look = 0, bool blink = false, bool wingsUp = false, bool perch = true}) {
+///   [closeLeft] / [closeRight]  close just one eye (as seen on screen) —
+///             e.g. waking up one eye at a time
+List<String> owlRows({
+  int look = 0,
+  bool blink = false,
+  bool wingsUp = false,
+  bool perch = true,
+  bool closeLeft = false,
+  bool closeRight = false,
+}) {
   final rows = <List<String>>[
     for (final half in _leftHalf) [...half.split(''), ...half.split('').reversed],
     for (final row in _branch) perch ? row.split('') : List.filled(owlGrid, '.'),
   ];
 
   for (final x0 in _eyeLefts) {
-    if (blink) {
-      // Closed eye: feathered lid with a dark line across.
-      for (var x = x0; x < x0 + 4; x++) {
-        rows[7][x] = 'b';
-        rows[8][x] = 'b';
-        rows[9][x] = 'k';
-        rows[10][x] = 'b';
+    final closed = blink || (x0 == _eyeLefts.first ? closeLeft : closeRight);
+    if (closed) {
+      // Closed eye: the whole eye socket becomes feathers with a soft,
+      // content "∪" line — like a sleepy smile.
+      for (var y = 6; y <= 11; y++) {
+        for (var x = x0 - 1; x <= x0 + 4; x++) {
+          rows[y][x] = 'b';
+        }
       }
+      rows[8][x0] = 'k';
+      rows[8][x0 + 3] = 'k';
+      rows[9][x0 + 1] = 'k';
+      rows[9][x0 + 2] = 'k';
     } else {
       // 2×2 pupil in the middle of the 4×4 eye, sliding left/right.
       final px = x0 + 1 + look.clamp(-1, 1);

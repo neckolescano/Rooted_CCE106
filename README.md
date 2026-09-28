@@ -1,207 +1,144 @@
-# Rooted — Setup Guide
+# kuwaGO
 
-> **Accounts + database:** the app now uses Firebase (login, profile,
-> stats, plant progress, notes and a session log are saved per account).
-> Before it will run, follow **FIREBASE_SETUP.md**.
+**A cozy pixel-art study garden.** kuwaGO is an AI-assisted Pomodoro and
+active-recall mobile app (Flutter, Android). Every completed focus session
+grows a pixel plant; fully grown plants are harvested into a collectible
+garden. Students can take notes during a session and turn them into
+AI-generated study questions and flashcards. The mascot is **kuwago**, a
+pixel owl (*kuwago* is Filipino for "owl").
 
-## 1. Extract & open
-Unzip this folder anywhere, then open it in VS Code / Android Studio as a
-Flutter project (it already has a `pubspec.yaml`, so your IDE should
-recognize it automatically).
+> Originally built as **"Rooted: An AI-Assisted Pomodoro and Active Recall
+> Mobile Application for Independent Student Learning"** for the CCE106
+> course. The app was renamed **kuwaGO** during development; the Flutter
+> package, folder and Firebase project IDs still use the old name `rooted`
+> (see [docs/12-decision-log.md](docs/12-decision-log.md)).
 
-## 2. Install packages
-In the terminal, inside the project folder, run:
+---
 
-```
+## Status at a glance (as of 2026-09-29)
+
+| Area | State |
+|---|---|
+| Core loop (study → grow → harvest → garden) | ✅ Working |
+| Pixel UI redesign (all main screens) | ✅ Done |
+| 4 collectible plant species + seed picker | ✅ Done |
+| Wilted plant art | ✅ Done |
+| AI study material (Gemini via Firebase AI Logic) | ✅ Working on the user's phone (after fixes) |
+| Study options ("Grow your study patch") | ✅ Done |
+| Offline (non-AI) study-card fallback | ✅ Done (keep/rename is an open question) |
+| kuwaGO name + owl icon + splash + grass loading screen | ✅ Done |
+| kuwago mascot (loading, login, Home) | ✅ Done |
+| Profile: photo, editable name | ✅ Done |
+| Player Card designs (8 designs + quests + shelf to equip) | ✅ Done |
+| Timer survives app backgrounding/kill | ❌ Not built |
+| Quiz flow / Summarize / Key concepts / Explain | ❌ Not built |
+
+Details: [docs/02-requirements-current.md](docs/02-requirements-current.md) ·
+open items: [docs/05-open-questions.md](docs/05-open-questions.md).
+
+---
+
+## Quick start (developer)
+
+Requirements: Flutter SDK (Dart `>=3.0.0 <4.0.0`), an Android phone or
+emulator, VS Code (the project has a launch config).
+
+```bash
 flutter pub get
 ```
 
-## 3. Your Piskel art is already in
-Your 5 stage sprites and 4 growth-transition animations are already
-placed and wired up:
+1. **AI App Check token (one-time, per developer):** create
+   `app_check.local.json` in the project root (it is git-ignored — never
+   commit it):
+   ```json
+   { "APP_CHECK_DEBUG_TOKEN": "<any UUID>" }
+   ```
+   and register that UUID as an App Check debug token in the **kuwago-ai**
+   Firebase project. Full steps: [AI_SETUP.md](AI_SETUP.md) and
+   [docs/10-ai-and-firebase.md](docs/10-ai-and-firebase.md).
+2. Run from VS Code with **F5 → "kuwaGO"** (passes
+   `--dart-define-from-file=app_check.local.json`), or:
+   ```bash
+   flutter run --dart-define-from-file=app_check.local.json
+   ```
+3. Use **"kuwaGO (profile — smooth animations)"** to judge animation
+   smoothness — debug builds are much slower.
 
-```
-assets/images/plant/stages/   seed.png, sprout.png, grow.png, bloom.png, fullgrown.png
-assets/images/plant/frames/   seed_sprout_00..09.png, sprout_grow_00..09.png,
-                               grow_bloom_00..09.png, bloom_fullgrown_00..09.png
-```
+Tests:
 
-There's no separate "wilted" art — when a session is given up on, the
-app just desaturates/darkens the current stage's sprite in code
-(`PlantDisplay`), so you don't need to draw extra wilted frames.
-
-If you redraw or add more art later, keep these exact names (or update
-the paths in `plant_model.dart`), and remember Flutter only picks up
-files placed **directly inside** `stages/` or `frames/` — not in new
-subfolders — unless you also add that subfolder to `pubspec.yaml`.
-
-## 4. Button art
-Every `PixelButton` in the app (Continue with Google, Create Cozy Account,
-Start Study Session, Pause/Resume, Give Up) now uses your hand-drawn
-wooden plaque instead of the old flat rectangle:
-
-```
-assets/images/buttons/button_plaque.png
+```bash
+flutter test
 ```
 
-It's a single 96×48 image reused everywhere — only the plain wood-grain
-gap in the middle (roughly x=50–79 in the source art) stretches to fit
-each button's width, so the flower details on both ends stay crisp and
-undistorted no matter how long the label is. If you redraw the art
-later with a plainer/wider middle section, widen `_stretchZone` in
-`lib/widgets/pixel_button.dart` to match.
+---
 
-The "Give Up" button gets a reddish color wash over the same plaque
-(via the `tint` parameter) instead of a separate image, so it still
-reads as the "danger" action.
+## Documentation map
 
-## 5. Harvest popup frame
-The congrats popup now uses your wooden scroll art instead of a plain
-box:
+Read in this order if you are new to the project:
+
+| # | Document | What's in it |
+|---|---|---|
+| 1 | [docs/01-product-overview.md](docs/01-product-overview.md) | Vision, core loop, identity, terminology, tone |
+| 2 | [docs/02-requirements-current.md](docs/02-requirements-current.md) | Confirmed requirements and what is implemented now |
+| 3 | [docs/03-mvp.md](docs/03-mvp.md) | What the MVP / course submission needs |
+| 4 | [docs/04-future-roadmap.md](docs/04-future-roadmap.md) | Phase plan and future ideas |
+| 5 | [docs/05-open-questions.md](docs/05-open-questions.md) | Unresolved decisions |
+| 6 | [docs/06-architecture.md](docs/06-architecture.md) | App structure, state, screens, widgets, services, boot flow |
+| 7 | [docs/07-data-model.md](docs/07-data-model.md) | Firestore, SharedPreferences, assets, models |
+| 8 | [docs/08-business-rules.md](docs/08-business-rules.md) | Growth, XP, unlocks, streaks, badges, quests, timer rules |
+| 9 | [docs/09-design-system.md](docs/09-design-system.md) | Colors, pixel rules, components, art pipeline |
+| 10 | [docs/10-ai-and-firebase.md](docs/10-ai-and-firebase.md) | Firebase projects, App Check, Gemini models, AI behaviour |
+| 11 | [docs/11-development-workflow.md](docs/11-development-workflow.md) | How to run, preview, generate art, test, and work with the owner |
+| 12 | [docs/12-decision-log.md](docs/12-decision-log.md) | Every major decision and why |
+| 13 | [docs/13-known-issues-and-tech-debt.md](docs/13-known-issues-and-tech-debt.md) | Bugs fixed, known limitations, cleanup candidates |
+
+Older reference documents (still valid in parts, superseded where the
+docs above say so):
+
+- [AI_SETUP.md](AI_SETUP.md) — step-by-step AI / App Check setup.
+- [FIREBASE_SETUP.md](FIREBASE_SETUP.md) — original Firebase (Auth +
+  Firestore) setup guide.
+- [docs/REDESIGN_PLAN.md](docs/REDESIGN_PLAN.md) — the 2026-09-28 redesign
+  plan and **artwork checklist** (the app was later renamed and got a
+  mascot; the checklist is still the art to-do list).
+
+---
+
+## Tech stack
+
+Flutter / Dart · `provider` (ChangeNotifier) · `shared_preferences` ·
+`google_fonts` (Press Start 2P + Nunito) · Firebase Auth · Cloud Firestore ·
+Firebase AI Logic (`firebase_ai`, Gemini Developer API) · Firebase App Check ·
+`google_sign_in` v7 · `image_picker` · dev tools: `flutter_launcher_icons`,
+`flutter_native_splash`. Art: Figma mockups + Piskel pixel art, plus
+code-generated sprites (`tool/`).
+
+## Project layout (short)
 
 ```
-assets/images/popups/harvest_frame.png
+lib/
+  main.dart                 boot flow (BootApp → loading screen → app)
+  firebase_options.dart     main Firebase project (rooted-f95c7)
+  firebase_options_ai.dart  AI-only Firebase project (kuwago-ai)
+  art/owl_art.dart          kuwago pixel art as text (drawn in code)
+  models/                   plant, session, notes, catalog, progress, badges,
+                            card designs, study material/options
+  screens/                  loading, login, main shell, home, timer, notes,
+                            study material, garden, profile
+  services/                 auth, cloud (Firestore), storage, AI, AI Firebase,
+                            offline study maker, prompt builder
+  theme/app_theme.dart      design tokens + AppInfo (app name)
+  widgets/                  pixel UI kit, scenes, mascot, dialogs, …
+tool/                       sprite + icon generators (dart run tool/…)
+assets/images/…             pixel art (see docs/07-data-model.md)
+ai_project/                 google-services.json of the AI project (NOT android/app)
+docs/                       this documentation
 ```
 
-Its baked-in "CONGRATULATIONS!" banner is kept as-is; the plant image,
-message, and buttons are positioned in the open parchment area below
-it using percentage-based padding (see the `Padding` inside
-`lib/widgets/harvest_celebration_dialog.dart`) — if you redraw the
-frame with the parchment area in a different spot, adjust those
-percentages to match.
+## Owner & working style
 
-## 6. Background scene (Timer screen)
-The Timer screen now supports a full-bleed background behind the plant.
-Drop your pixel-art meadow/garden image in as:
-
-```
-assets/images/backgrounds/garden_meadow.png
-```
-
-Until that file exists, it falls back to a soft gradient so the screen
-doesn't go back to plain black. The `BackgroundScene` widget in
-`lib/widgets/background_scene.dart` is reusable — Home screen could get
-the same treatment later if you want a consistent look across screens,
-just wrap its body in `BackgroundScene(child: ...)` too.
-
-## 4. Run it
-
-```
-flutter run
-```
-
-## What's included in this batch
-- Login/Register screen (buttons work, but there's no real Google/account
-  auth yet — they just take you into the app)
-- Home screen with the current plant + Start Study Session button
-- Timer screen with a real 25-minute countdown, Pause/Resume, and Give Up
-- **Fixed:** bottom nav bar was stretching to fill the whole screen
-  (missing height constraint) — it's now a normal fixed-height bar
-- **Fixed:** Timer screen was missing its own `Scaffold`, so it rendered
-  on plain black instead of your theme background
-- All buttons now use your hand-drawn wooden plaque art (9-slice
-  stretched) instead of the flat rectangle style
-- **Fixed:** finishing a session while the plant was already fully
-  grown used to silently do nothing useful (no next stage to grow
-  into). Now it triggers a proper harvest: the plant is recorded to
-  the Garden, a congrats popup appears, and the student chooses to
-  either go home or start a new session (which resets to a fresh seed)
-- **Fixed:** a real "fast forward" bug — opening the Timer screen could
-  briefly see a leftover `"completed"` status from the *previous*
-  session (since `SessionModel` lives at the app root) and instantly
-  fire the growth/finish sequence before the new countdown even
-  started
-- **Fixed a crash introduced by that first fix:** calling
-  `SessionModel.start()` synchronously in `initState` threw
-  `setState() or markNeedsBuild() called during build`, since
-  `notifyListeners()` can't fire while Flutter is still building this
-  same widget tree. The real fix keeps `start()` inside
-  `addPostFrameCallback` (safe timing) and instead adds a local
-  `_sessionStarted` flag that only trusts a `"completed"` status once
-  *this* screen has confirmed its own session actually started —
-  closing the original race without reintroducing the crash
-- Harvest popup now uses your new hand-drawn wooden scroll frame art,
-  with a bigger plant, sparkle effects around it (pure code, no extra
-  art needed — see `lib/widgets/sparkle_overlay.dart`), and friendlier
-  copy
-- Plant art on Home, Timer, and in the harvest popup is bigger/more
-  visible (was rendering smaller than it needed to)
-- **Fixed:** bottom nav overflowed by 3px on whichever tab was
-  selected — only the selected tab had a border, which shrank that
-  one item's available content height compared to the others. Every
-  tab now reserves the same border space (transparent when unselected)
-- Timer screen now supports a full-bleed background scene behind the
-  plant (falls back to a soft gradient until you add the art)
-- Your real Piskel art wired in for all 5 stages
-- A short growth animation plays on the Timer screen when a session
-  completes (using your 10-frame transition art), before returning home
-- Giving up desaturates/darkens the plant in place — no wilted art needed
-- Garden screen (streak, total sessions, and the fully-grown planted
-  row are all real and saved now; the "unlocked species" list below it
-  is still placeholder data — see Known simplifications)
-- Profile screen (push reminders toggle is local UI only for now)
-- Streak, total sessions, and plant progress are saved on-device and
-  survive closing the app
-
-## Known simplifications (flagged in code with comments)
-- The timer doesn't yet account for the app being backgrounded/killed
-  mid-session (your Chapter 1 doc calls this out as an anticipated
-  challenge — worth tackling once the core flow feels good)
-- Garden screen's "unlocked species" list (Wild Sunflower, Desert
-  Cactus, etc.) is still hardcoded placeholder data — there's only one
-  plant/species in the app so far, so this is waiting on that feature
-- The harvest popup (`lib/widgets/harvest_celebration_dialog.dart`) is a
-  placeholder design matching the app's look — swap in your own
-  Figma/Piskel popup art whenever it's ready; it only needs to keep
-  returning `true` (start new session) / `false` (go home) from its two
-  buttons for the logic underneath to keep working
-- **AI study material isn't connected to a real backend yet.** See
-  "Notes + AI Study Assistant" below — this is the one deliberate gap
-  left in an otherwise fully working feature
-
-## Notes + AI Study Assistant
-
-New this batch. From the Timer screen, tap the **NOTES** chip (top
-right, next to "SESSION EN ROUTE") to open a notes page:
-
-- **The Pomodoro countdown keeps running.** The Notes and Study
-  Material screens show a compact header (`CompactTimerHeader`) that
-  just *watches* the same `SessionModel` the Timer screen uses — there
-  is no second timer anywhere. Pausing from that compact header pauses
-  the real session, and going back to the Timer screen shows the same
-  countdown, uninterrupted.
-- **Notes persist** two ways: in `NotesModel` (a root-level provider,
-  like `PlantModel`) so navigating Timer → Notes → Study Material →
-  back never loses anything mid-session, AND saved to disk via
-  `StorageService.saveNotes()` so they're still there if the app is
-  closed and reopened.
-- **"✨ Generate Study Material"** is disabled in spirit — tapping it
-  with empty notes shows a message instead of calling anything, per
-  the spec.
-
-### The one gap: AI isn't wired to a real provider
-
-`lib/services/ai_service.dart` is intentionally **not** connected to
-an actual AI API. Calling an AI provider directly from the app would
-mean putting a secret API key inside the compiled app, where anyone
-could extract it — exactly what you asked NOT to do. Instead of
-faking that with a hardcoded key, `generateStudyMaterial()` throws a
-clear, honest error, which exercises the real error UI (message +
-Retry button) you asked for.
-
-Everything else is fully built and working end-to-end: the prompt
-text (`lib/services/study_material_prompt.dart`, matches your spec's
-prompt exactly), JSON parsing into `StudyMaterial`/`StudyQuestion`/
-`Flashcard` (`lib/models/study_material.dart`, tolerant of missing/
-malformed fields), the loading state, the error+Retry state, the
-Study Material page with Questions/Flashcards tabs, multiple-choice
-answer checking, flashcard flip/prev/next with a counter — all of it.
-
-**To connect it for real:** once you've decided how to host your AI
-API key (a small serverless function, your own backend, Firebase,
-etc. — never directly in the Flutter app), replace the body of
-`AiService.generateStudyMaterial()` with a real HTTP call to *your
-backend* (not directly to the AI provider), and parse its JSON
-response with `StudyMaterial.fromJson()`. Nothing else in the feature
-needs to change. Let me know what backend approach you want to use
-and I can wire that call in.
+Built by **Necko** (student) on Windows + VS Code, testing on a physical
+Android phone (itel S665L, Android 12). Prefers small batches, plain
+explanations, targeted edits with diffs, comments that explain *why*, and
+real pixel art over code-drawn art where possible. See
+[docs/11-development-workflow.md](docs/11-development-workflow.md).

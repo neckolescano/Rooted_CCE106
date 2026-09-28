@@ -64,16 +64,20 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 # ---------------------------------------------------------------------------
-# Launch splash: what the phone shows for the split second before Flutter
-# starts (it used to be black/white). After changing it run:
+# Launch splash: what the phone shows the instant the app is opened — the
+# kuwaGO lockup (kuwago perched on the clock O) on leaf green.
+#   Android 12+: ANIMATED (the minute hand winds a lap, kuwago bobs) —
+#                made by tool/generate_splash_anim.dart.
+#   Older:       the same picture, still.
+# The opening (lib/widgets/clock_intro.dart) then carries on from the
+# exact same frame. After changing anything here, run BOTH, in order:
 #   dart run flutter_native_splash:create
-# The animated grass loading screen (lib/screens/loading_screen.dart)
-# takes over right after this.
+#   dart run tool/generate_splash_anim.dart
 # ---------------------------------------------------------------------------
 flutter_native_splash:
-  color: "#F3E8D2"
-  image: assets/icon/splash_logo.png
+  color: "#DCEFC8"
+  image: assets/icon/splash_lockup.png
   android_12:
-    color: "#F3E8D2"
-    image: assets/icon/splash_logo.png
+    color: "#DCEFC8"
+    image: assets/icon/splash_lockup.png
   web: false

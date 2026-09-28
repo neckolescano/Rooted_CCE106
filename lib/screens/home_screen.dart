@@ -10,6 +10,7 @@ import '../widgets/greenhouse_scene.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/pixel_progress_bar.dart';
+import '../widgets/page_entrance.dart';
 import '../widgets/seed_picker.dart';
 import '../widgets/window_zoom.dart';
 import 'timer_screen.dart';
@@ -83,53 +84,71 @@ class HomeScreen extends StatelessWidget {
       plantStageIndex: plant.stage.index,
     );
 
-    return Padding(
-      padding: AppSpacing.screen,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Header(progress: progress, streak: storage.streak),
-          const SizedBox(height: AppSpacing.md),
-          // The greenhouse takes all the leftover height, so on tall
-          // phones the plant simply gets bigger — no empty cream gap.
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: GreenhouseScene(
-                    plant: plant,
-                    windowKey: _windowKey,
-                    owlMessages: _owlLines(plant, storage, progress.completedSessions),
-                  ),
+    // Entrance: the header drops in, the greenhouse fades up (kuwago is
+    // flown onto its sill by the opening), then the rest rises in turn.
+    return PageEntrance(
+      child: Padding(
+        padding: AppSpacing.screen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            EntranceItem(from: 0, to: 0.4, slide: -24, child: _Header(progress: progress, streak: storage.streak)),
+            const SizedBox(height: AppSpacing.md),
+            // The greenhouse takes all the leftover height, so on tall
+            // phones the plant simply gets bigger — no empty cream gap.
+            // (Fade only: it must not move while kuwago is landing in it.)
+            Expanded(
+              child: EntranceItem(
+                from: 0.1,
+                to: 0.5,
+                slide: 0,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GreenhouseScene(
+                        plant: plant,
+                        windowKey: _windowKey,
+                        owlMessages: _owlLines(plant, storage, progress.completedSessions),
+                      ),
+                    ),
+                    // Seed packet tag: which plant is planted. Only a seed can
+                    // be swapped, so it's tappable only before the first
+                    // session of a new plant.
+                    Positioned(
+                      left: 6,
+                      top: 6,
+                      child: _SeedTag(plant: plant, completedSessions: progress.completedSessions),
+                    ),
+                  ],
                 ),
-                // Seed packet tag: which plant is planted. Only a seed can
-                // be swapped, so it's tappable only before the first
-                // session of a new plant.
-                Positioned(
-                  left: 6,
-                  top: 6,
-                  child: _SeedTag(plant: plant, completedSessions: progress.completedSessions),
-                ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _GrowthTrack(plant: plant),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            '"${_quoteFor(plant)}"',
-            textAlign: TextAlign.center,
-            style: AppTheme.body(size: 13, weight: FontWeight.w600),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          // How long the session will be — the Timer counts down this.
-          const FocusTimeSetter(),
-          const SizedBox(height: AppSpacing.md),
-          PixelButton(
-            label: 'Start Study Session',
-            onPressed: () => _startSession(context),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.md),
+            EntranceItem(from: 0.35, to: 0.7, child: _GrowthTrack(plant: plant)),
+            const SizedBox(height: AppSpacing.md),
+            EntranceItem(
+              from: 0.42,
+              to: 0.77,
+              child: Text(
+                '"${_quoteFor(plant)}"',
+                textAlign: TextAlign.center,
+                style: AppTheme.body(size: 13, weight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // How long the session will be — the Timer counts down this.
+            const EntranceItem(from: 0.5, to: 0.85, child: FocusTimeSetter()),
+            const SizedBox(height: AppSpacing.md),
+            EntranceItem(
+              from: 0.58,
+              to: 0.95,
+              child: PixelButton(
+                label: 'Start Study Session',
+                onPressed: () => _startSession(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -172,8 +191,10 @@ class _SeedTag extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Text(
               'CHANGE',
-              style: AppText.caption(color: AppColors.accentGold)
-                  .copyWith(fontWeight: FontWeight.w900, decoration: TextDecoration.underline, decorationColor: AppColors.accentGold),
+              style: AppText.caption(color: AppColors.accentGold).copyWith(
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.underline,
+                  decorationColor: AppColors.accentGold),
             ),
           ],
         ],
