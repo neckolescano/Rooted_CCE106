@@ -1,0 +1,620 @@
+// Draws kuwaGO's own pixel-art meadow backgrounds (no outside art), in a
+// cozy cottagecore style: a sky with soft clouds, rolling hills with a
+// little cottage, a winding dirt path, wildflower fields, an apple tree
+// and tall foreground grass.
+//
+// Three seasons are drawn from the same layout:
+//   garden_meadow.png         spring/summer (the default scene)
+//   garden_meadow_autumn.png  golden fields, orange tree, pumpkins
+//   garden_meadow_winter.png  snow, a snowy evergreen, a snowman
+//
+// Each is drawn at 184 x 327 pixels and scaled up 4x (736 x 1308, the size
+// the app's layouts were tuned for).
+//
+// Run from the project root:
+//   dart run tool/generate_meadow.dart
+
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+const w = 184, h = 327, scale = 4;
+const horizon = 188; // where the hills meet the fields
+
+enum Season { summer, autumn, winter }
+
+class Pal {
+  const Pal({
+    required this.sky,
+    required this.cloud,
+    required this.farHill,
+    required this.nearHill,
+    required this.field,
+    required this.grass,
+    required this.canopy,
+    required this.path,
+    required this.flowers,
+  });
+  final List<int> sky; // top → horizon
+  final List<int> cloud; // light, mid, shade
+  final List<int> farHill; // light, dark
+  final List<int> nearHill; // light, dark
+  final List<int> field; // three stripe tones, light → dark
+  final List<int> grass; // blade tones, light → dark, outline
+  final List<int> canopy; // light, mid, dark, outline
+  final List<int> path; // light, dark
+  final List<int> flowers;
+}
+
+const summer = Pal(
+  sky: [0xFF6FB8EA, 0xFF84C4EE, 0xFF9DD1F2, 0xFFB8DEF5, 0xFFD4ECF7],
+  cloud: [0xFFFFFFFF, 0xFFEEF6FB, 0xFFCFE2EF],
+  farHill: [0xFFA7CBB2, 0xFF93BCA0],
+  nearHill: [0xFF86B97C, 0xFF6FA66A],
+  field: [0xFFA4D062, 0xFF94C455, 0xFF84B84A],
+  grass: [0xFF8CC152, 0xFF63A23E, 0xFF3F7A2E, 0xFF1F3A17],
+  canopy: [0xFF7DB85A, 0xFF5A9A43, 0xFF3D7330, 0xFF173015],
+  path: [0xFFE2C495, 0xFFCDA877],
+  flowers: [0xFFFFFFFF, 0xFFFFE066, 0xFFC7A6F2, 0xFFFF9AB8, 0xFFE8483F, 0xFF5B8DEF],
+);
+
+const autumn = Pal(
+  sky: [0xFF78AEDA, 0xFF93BEDF, 0xFFB2CFE2, 0xFFD3DDDF, 0xFFF0E1C8],
+  cloud: [0xFFFFFBF2, 0xFFF4EADB, 0xFFDCCDB8],
+  farHill: [0xFFC7C394, 0xFFB5AF7E],
+  nearHill: [0xFFC2A55A, 0xFFAA8C45],
+  field: [0xFFE3C76A, 0xFFD6B657, 0xFFC7A248],
+  grass: [0xFFD9B456, 0xFFB98C3A, 0xFF8A6428, 0xFF3E2A12],
+  canopy: [0xFFF2A444, 0xFFDD7A2E, 0xFFB3521F, 0xFF4A2210],
+  path: [0xFFD9B98A, 0xFFC09A68],
+  flowers: [0xFFFFE066, 0xFFE8702A, 0xFFB5402A, 0xFFF2C14E],
+);
+
+const winter = Pal(
+  sky: [0xFF93AFCB, 0xFFA5BED6, 0xFFB8CCE0, 0xFFCBDAE8, 0xFFDEE7F0],
+  cloud: [0xFFFFFFFF, 0xFFEEF2F7, 0xFFD3DDE8],
+  farHill: [0xFFDCE6EF, 0xFFC8D6E3],
+  nearHill: [0xFFEFF4F8, 0xFFDAE4EE],
+  field: [0xFFF7FAFC, 0xFFEBF1F6, 0xFFDDE7F0],
+  grass: [0xFFE3ECF3, 0xFFB9CAD8, 0xFF7F95A8, 0xFF3A4A58],
+  canopy: [0xFF4E8A5E, 0xFF3A7050, 0xFF28543C, 0xFF12291C],
+  path: [0xFFE4ECF3, 0xFFD2DDE8],
+  flowers: [0xFFFFFFFF],
+);
+
+class Canvas {
+  final px = Uint32List(w * h);
+  void set(int x, int y, int c) {
+    if (x >= 0 && y >= 0 && x < w && y < h) px[y * w + x] = c;
+  }
+
+  int get(int x, int y) => (x >= 0 && y >= 0 && x < w && y < h) ? px[y * w + x] : 0;
+
+  void rect(int x0, int y0, int x1, int y1, int c) {
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        set(x, y, c);
+      }
+    }
+  }
+
+  void disc(double cx, double cy, double r, int Function(int x, int y) color) {
+    for (var y = (cy - r).floor(); y <= (cy + r).ceil(); y++) {
+      for (var x = (cx - r).floor(); x <= (cx + r).ceil(); x++) {
+        final dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+        if (dx * dx + dy * dy > r * r) continue;
+        final col = color(x, y);
+        if (col != -1) set(x, y, col); // -1 = leave this pixel alone
+      }
+    }
+  }
+}
+
+/// Deterministic per-pixel noise in 0..1.
+double noise(int x, int y, [int salt = 0]) {
+  var n = x * 374761393 + y * 668265263 + salt * 1442695041;
+  n = (n ^ (n >> 13)) * 1274126177;
+  return ((n ^ (n >> 16)) & 0xFFFF) / 65535.0;
+}
+
+double farRidge(int x) => 172 + 5 * math.sin(x * 0.06) + 3 * math.sin(x * 0.17 + 1.3);
+double nearRidge(int x) => 182 + 4 * math.sin(x * 0.045 + 2.2) + 2 * math.sin(x * 0.13 + 0.4);
+
+Uint32List draw(Season s) {
+  final p = switch (s) { Season.summer => summer, Season.autumn => autumn, Season.winter => winter };
+  final c = Canvas();
+  final rnd = math.Random(7);
+
+  // --- sky: five soft bands with a dithered edge between each ---------------
+  const bandH = 38.0;
+  for (var y = 0; y < horizon + 12; y++) {
+    final t = y / bandH;
+    var band = t.floor().clamp(0, p.sky.length - 1);
+    final into = t - t.floor();
+    for (var x = 0; x < w; x++) {
+      var b = band;
+      if (into > 0.8 && band < p.sky.length - 1 && (x + y) % 2 == 0) b = band + 1;
+      c.set(x, y, p.sky[b]);
+    }
+  }
+
+  // --- clouds ------------------------------------------------------------------
+  // A fluffy cumulus: a row of round puffs, tallest in the middle, with a
+  // flat base, a lit top-left and a shaded underside.
+  void cloud(double cx, double baseY, double width, double height, int seed) {
+    final r = math.Random(seed);
+    const n = 7;
+    final puffs = <List<double>>[];
+    for (var i = 0; i < n; i++) {
+      final t = i / (n - 1);
+      final rad = height * (0.45 + 0.55 * math.sin(math.pi * t)) * (0.85 + r.nextDouble() * 0.3);
+      puffs.add([cx - width / 2 + t * width, baseY - rad * 0.55, rad]);
+    }
+    // a second, smaller row on top for a lumpy crown
+    for (var i = 1; i < n - 1; i += 2) {
+      final pf = puffs[i];
+      puffs.add([pf[0] + (r.nextDouble() - 0.5) * 6, pf[1] - pf[2] * 0.55, pf[2] * 0.7]);
+    }
+    for (final pf in puffs) {
+      c.disc(pf[0], pf[1], pf[2], (x, y) {
+        if (y > baseY) return -1;
+        final fromTop = (y - (pf[1] - pf[2])) / (2 * pf[2]);
+        final leftness = (x - pf[0]) / pf[2];
+        if (y > baseY - height * 0.22) return p.cloud[2];
+        if (fromTop < 0.45 && leftness < 0.35) return p.cloud[0];
+        return p.cloud[1];
+      });
+    }
+  }
+
+  cloud(48, 78, 78, 20, 1);
+  cloud(70, 140, 96, 17, 2);
+  cloud(128, 44, 40, 11, 3);
+  cloud(16, 24, 34, 8, 4);
+  // thin haze streaks near the horizon
+  for (final st in [[30, 158, 60], [110, 166, 70]]) {
+    c.rect(st[0], st[1], st[0] + st[2], st[1] + 1, p.cloud[1]);
+    c.rect(st[0] + 8, st[1] - 1, st[0] + st[2] - 10, st[1] - 1, p.cloud[0]);
+  }
+
+  // little birds (not in winter)
+  if (s != Season.winter) {
+    for (final b in [[58, 78], [66, 73], [74, 80]]) {
+      c.set(b[0] - 1, b[1] - 1, 0xFF4A5A6A);
+      c.set(b[0], b[1], 0xFF4A5A6A);
+      c.set(b[0] + 1, b[1] - 1, 0xFF4A5A6A);
+    }
+  }
+
+  // --- far hills, then near hills ----------------------------------------------
+  for (var x = 0; x < w; x++) {
+    final top = farRidge(x).round();
+    for (var y = top; y < horizon + 14; y++) {
+      c.set(x, y, (y - top < 2 && noise(x, y, 1) > 0.3) ? p.farHill[0] : p.farHill[1]);
+    }
+  }
+  // distant round trees (or snowy pines) on the far hills
+  for (final tx in [66, 78, 118, 131]) {
+    final base = farRidge(tx).round() + 2;
+    if (s == Season.winter) {
+      for (var i = 0; i < 7; i++) {
+        c.rect(tx - (i ~/ 2), base - 7 + i, tx + (i ~/ 2), base - 7 + i, i < 2 ? 0xFFFFFFFF : 0xFF5E7F78);
+      }
+    } else {
+      final col = s == Season.autumn ? 0xFFCF7A34 : 0xFF6A9E6A;
+      final dark = s == Season.autumn ? 0xFFA85A28 : 0xFF578A5A;
+      c.disc(tx + 0.5, base - 4.0, 3.2, (x, y) => y > base - 4 ? dark : col);
+    }
+  }
+  for (var x = 0; x < w; x++) {
+    final top = nearRidge(x).round();
+    for (var y = top; y < h; y++) {
+      c.set(x, y, (y - top < 2) ? p.nearHill[0] : p.nearHill[1]);
+    }
+  }
+
+  // --- fields: stripes that widen toward the viewer ---------------------------
+  for (var y = horizon; y < h; y++) {
+    final depth = (y - horizon) / (h - horizon);
+    final stripe = ((math.sqrt(y - horizon) * 2.2).floor()) % 3;
+    for (var x = 0; x < w; x++) {
+      final ridge = nearRidge(x);
+      if (y < ridge + 5) continue;
+      var tone = stripe;
+      if (noise(x, y, 2) > 0.86 - depth * 0.2) tone = (tone + 1) % 3;
+      c.set(x, y, p.field[tone]);
+    }
+  }
+
+  // --- the cottage on the hill --------------------------------------------------
+  const cx = 34;
+  final ground = nearRidge(cx).round() + 1;
+  // smoke puffs drifting right
+  final smoke = s == Season.winter ? 0xFFF4F7FA : 0xFFE9EEF2;
+  for (final sp in [[42.0, ground - 22.0, 1.6], [45.5, ground - 27.0, 2.1], [50.0, ground - 32.0, 2.6]]) {
+    c.disc(sp[0], sp[1], sp[2], (x, y) => smoke);
+  }
+  c.rect(cx - 6, ground - 8, cx + 6, ground, 0xFFF3E3C3); // walls
+  c.rect(cx - 6, ground - 8, cx - 6, ground, 0xFFD9C49E); // wall shade edge
+  c.rect(cx + 6, ground - 8, cx + 6, ground, 0xFFD9C49E);
+  c.rect(cx - 1, ground - 4, cx + 1, ground, 0xFF7A4E2E); // door
+  c.rect(cx + 3, ground - 6, cx + 4, ground - 5, 0xFFFFD86B); // lit window
+  c.rect(cx - 5, ground - 6, cx - 4, ground - 5, 0xFFFFD86B);
+  // window boxes with tiny flowers (berries in autumn, snow in winter)
+  for (final wx in [cx - 5, cx + 3]) {
+    c.rect(wx - 1, ground - 4, wx + 2, ground - 4, 0xFF8A5A40);
+    final bloom = switch (s) { Season.summer => 0xFFFF7FA8, Season.autumn => 0xFFE8702A, Season.winter => 0xFFFFFFFF };
+    c.set(wx - 1, ground - 5, bloom);
+    c.set(wx + 2, ground - 5, bloom);
+  }
+  // pitched roof: widest at the eaves, narrowing to the ridge
+  for (var i = 0; i < 7; i++) {
+    final roofCol = i >= 4 && s == Season.winter
+        ? 0xFFFFFFFF
+        : (i == 0 ? 0xFF7A3325 : (i < 4 ? 0xFF9E4430 : 0xFFC0603F));
+    c.rect(cx - 8 + i, ground - 9 - i, cx + 8 - i, ground - 9 - i, roofCol);
+  }
+  c.rect(cx - 8, ground - 9, cx - 8, ground - 9, 0xFF5A2418); // eave ends
+  c.rect(cx + 8, ground - 9, cx + 8, ground - 9, 0xFF5A2418);
+  c.rect(cx + 4, ground - 18, cx + 5, ground - 13, 0xFF8A5A40); // chimney
+  if (s == Season.winter) c.rect(cx + 4, ground - 18, cx + 5, ground - 18, 0xFFFFFFFF);
+  // a tiny garden fence beside it
+  for (var fx = cx + 9; fx < cx + 20; fx += 3) {
+    c.rect(fx, ground - 3, fx, ground, 0xFF9A7250);
+  }
+  c.rect(cx + 9, ground - 2, cx + 18, ground - 2, 0xFFB08560);
+  if (s == Season.autumn) {
+    c.disc(cx - 9.5, ground - 1.0, 1.8, (x, y) => 0xFFE8802A);
+    c.set(cx - 10, ground - 3, 0xFF4E7A2E);
+  }
+
+  // --- the winding dirt path from the cottage door toward the viewer -----------
+  for (var y = ground + 1; y < h - 30; y++) {
+    final d = (y - ground).toDouble();
+    final centre = cx - d * 0.18 + 6 * math.sin(d * 0.045) + d * d * 0.0007;
+    final half = 0.8 + d * 0.085;
+    for (var x = (centre - half).floor(); x <= (centre + half).ceil(); x++) {
+      final edge = (x - centre).abs() > half - 1;
+      c.set(x, y, edge || noise(x, y, 3) > 0.8 ? p.path[1] : p.path[0]);
+    }
+  }
+
+  // --- a little pond (frozen in winter) with lily pads ---------------------------
+  const pondX = 15.0, pondY = 217.0;
+  final water = switch (s) { Season.summer => 0xFF7FBDE8, Season.autumn => 0xFF8FB6D6, Season.winter => 0xFFD6E8F4 };
+  final waterDark = switch (s) { Season.summer => 0xFF5E9FD0, Season.autumn => 0xFF6E98BC, Season.winter => 0xFFB8D2E6 };
+  final shore = switch (s) { Season.summer => 0xFF6E9A4A, Season.autumn => 0xFF9A7A3A, Season.winter => 0xFFC8D6E3 };
+  for (var y = (pondY - 5).floor(); y <= (pondY + 5).ceil(); y++) {
+    for (var x = (pondX - 14).floor(); x <= (pondX + 14).ceil(); x++) {
+      final dx = (x + 0.5 - pondX) / 14, dy = (y + 0.5 - pondY) / 5;
+      final d = dx * dx + dy * dy;
+      if (d > 1) continue;
+      c.set(x, y, d > 0.75 ? shore : (dy > 0.2 ? waterDark : water));
+    }
+  }
+  c.rect(8, 215, 13, 215, 0xFFFFFFFF); // sparkle on the water
+  c.rect(18, 219, 21, 219, s == Season.winter ? 0xFFFFFFFF : 0xFFBFE3F8);
+  if (s == Season.summer) {
+    for (final lp in [[6, 218], [22, 216], [14, 220]]) {
+      c.rect(lp[0], lp[1], lp[0] + 2, lp[1], 0xFF4E8A3A);
+      c.set(lp[0] + 1, lp[1] - 1, 0xFF6FAA4E);
+    }
+    c.set(23, 215, 0xFFFF9AB8); // a water-lily flower
+  }
+
+  // --- a wooden signpost by the path ---------------------------------------------
+  c.rect(46, 199, 46, 207, 0xFF6B4A2E);
+  c.rect(42, 199, 51, 201, 0xFFB08560);
+  c.rect(42, 202, 51, 202, 0xFF8A6440);
+  c.set(51, 200, 0xFFB08560);
+  c.set(52, 200, 0xFFB08560); // arrow tip
+  if (s == Season.winter) c.rect(42, 198, 51, 198, 0xFFFFFFFF);
+
+  // --- wildflowers dotted over the fields -----------------------------------
+  for (var i = 0; i < 520; i++) {
+    final y = horizon + 8 + (math.pow(rnd.nextDouble(), 0.7) * (h - horizon - 60)).round();
+    final x = rnd.nextInt(w);
+    final col = p.flowers[rnd.nextInt(p.flowers.length)];
+    if (s == Season.winter && rnd.nextDouble() > 0.15) continue; // only a few sparkles in the snow
+    final big = y > horizon + 70;
+    c.set(x, y, col);
+    if (big) c.set(x + 1, y, col);
+  }
+
+  // --- apple tree on the right (a snowy evergreen in winter) -----------------
+  void tree() {
+    // trunk: stands at the back of the field, mostly hidden by leaves
+    for (var y = 120; y < 214; y++) {
+      final wob = (1.5 * math.sin(y * 0.08)).round();
+      final spread = y > 204 ? (y - 204) ~/ 2 : 0; // roots flare out
+      for (var x = 170 + wob - spread; x < 178 + wob + spread; x++) {
+        final col = x < 172 + wob - spread ? 0xFF4E3420 : (noise(x, y, 4) > 0.75 ? 0xFF7E5A3A : 0xFF6B4A2E);
+        c.set(x, y, col);
+      }
+      c.set(169 + wob - spread, y, 0xFF2A1A10);
+      c.set(178 + wob + spread, y, 0xFF2A1A10);
+    }
+    // a soft shadow under the tree
+    for (var x = 156; x < w; x++) {
+      c.set(x, 214, p.field[2]);
+      if (x > 162) c.set(x, 215, p.field[2]);
+    }
+    // branch reaching left
+    for (var i = 0; i < 16; i++) {
+      c.rect(170 - i, 150 - (i ~/ 2), 171 - i, 151 - (i ~/ 2), 0xFF5A3C24);
+    }
+    // canopy clumps
+    final clumps = [
+      [176.0, 26.0, 18.0], [158.0, 42.0, 15.0], [180.0, 60.0, 19.0], [150.0, 74.0, 14.0], [170.0, 92.0, 18.0],
+      [150.0, 110.0, 13.0], [182.0, 118.0, 16.0], [162.0, 132.0, 14.0], [146.0, 140.0, 10.0], [182.0, 4.0, 14.0],
+      [164.0, 12.0, 11.0],
+    ];
+    final mask = List<int>.filled(w * h, -1);
+    for (var i = 0; i < clumps.length; i++) {
+      final k = clumps[i];
+      for (var y = (k[1] - k[2]).floor(); y <= (k[1] + k[2]).ceil(); y++) {
+        for (var x = (k[0] - k[2]).floor(); x <= (k[0] + k[2]).ceil(); x++) {
+          final dx = x + 0.5 - k[0], dy = y + 0.5 - k[1];
+          // bumpy edge: leaves, not a perfect circle
+          final r = k[2] * (0.88 + 0.12 * noise(x ~/ 2, y ~/ 2, 5));
+          if (dx * dx + dy * dy > r * r || x < 0 || x >= w || y < 0 || y >= h) continue;
+          final lit = (dx + dy) / k[2]; // -: upper-left, +: lower-right
+          var tone = lit < -0.55 ? 0 : (lit < 0.35 ? 1 : 2);
+          if (noise(x, y, 6) > 0.82) tone = (tone + 1).clamp(0, 2);
+          mask[y * w + x] = tone;
+          if (s == Season.winter && dy < -k[2] * 0.45 && noise(x, y, 7) > 0.2) mask[y * w + x] = 9; // snow cap
+        }
+      }
+    }
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final m = mask[y * w + x];
+        if (m < 0) {
+          // outline where a leaf pixel touches empty space
+          final touches = [[1, 0], [-1, 0], [0, 1], [0, -1]].any((d) {
+            final nx = x + d[0], ny = y + d[1];
+            return nx >= 0 && ny >= 0 && nx < w && ny < h && mask[ny * w + nx] >= 0;
+          });
+          if (touches) c.set(x, y, p.canopy[3]);
+          continue;
+        }
+        c.set(x, y, m == 9 ? (noise(x, y, 8) > 0.5 ? 0xFFFFFFFF : 0xFFE3ECF4) : p.canopy[m]);
+      }
+    }
+    // apples (summer) or a few loose leaves (autumn)
+    if (s == Season.summer) {
+      for (final a in [[160, 52], [172, 70], [155, 84], [177, 96], [164, 112], [182, 40], [150, 66]]) {
+        c.set(a[0], a[1], 0xFFD8392B);
+        c.set(a[0] + 1, a[1], 0xFFB82A20);
+        c.set(a[0], a[1] + 1, 0xFFB82A20);
+        c.set(a[0] + 1, a[1] + 1, 0xFF8E1F18);
+        c.set(a[0], a[1] - 1, 0xFF3A5A20);
+      }
+    }
+  }
+
+  tree();
+
+  // --- a row of round bushes in the middle distance ----------------------------
+  final bushLight = s == Season.autumn ? 0xFFD08A3A : (s == Season.winter ? 0xFF6E9A7E : 0xFF6FA84E);
+  final bushMid = s == Season.autumn ? 0xFFB06A2A : (s == Season.winter ? 0xFF4F7C62 : 0xFF558E3E);
+  final bushDark = s == Season.autumn ? 0xFF7E4620 : (s == Season.winter ? 0xFF35584A : 0xFF3C6E2E);
+  for (final b in [
+    [6.0, 240.0, 9.0], [20.0, 236.0, 8.0], [34.0, 241.0, 7.0], [150.0, 238.0, 8.0], [164.0, 234.0, 10.0],
+    [180.0, 240.0, 9.0], [122.0, 243.0, 6.0],
+  ]) {
+    c.disc(b[0], b[1], b[2], (x, y) {
+      if (y > b[1] + b[2] * 0.4) return -1; // flat base
+      final dx = x - b[0], dy = y - b[1];
+      if (s == Season.winter && dy < -b[2] * 0.5) return 0xFFFFFFFF;
+      if (dx + dy < -b[2] * 0.6) return bushLight;
+      return (dx + dy > b[2] * 0.3 || noise(x, y, 12) > 0.8) ? bushDark : bushMid;
+    });
+    if (s == Season.summer) {
+      for (var k = 0; k < 3; k++) {
+        c.set((b[0] - b[2] * 0.5 + k * b[2] * 0.5).round(), (b[1] - b[2] * 0.2 + (k % 2) * 3).round(),
+            [0xFFFF9AB8, 0xFFFFFFFF, 0xFFFFE066][k]);
+      }
+    }
+  }
+
+  // --- foreground: darker ground, tall grass blades and flowers -------------
+  for (var y = 262; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final d = (y - 262) / (h - 262);
+      final tone = noise(x, y, 9) < 0.5 - d * 0.3 ? 1 : 2;
+      c.set(x, y, s == Season.winter ? p.field[tone] : p.grass[tone]);
+    }
+  }
+  if (s == Season.winter) {
+    // snow drifts over the foreground ground
+    for (var x = 0; x < w; x++) {
+      final top = 268 + 6 * math.sin(x * 0.08) + 3 * math.sin(x * 0.21);
+      for (var y = top.round(); y < h; y++) {
+        c.set(x, y, y - top < 2 ? 0xFFFFFFFF : (noise(x, y, 10) > 0.85 ? 0xFFDCE6EF : 0xFFF1F5F9));
+      }
+    }
+  }
+
+  // dense grass texture: short upward strokes in three tones
+  for (var y = 246; y < h + 6; y += 2) {
+    for (var x = 0; x < w; x++) {
+      final n = noise(x, y, 11);
+      if (n > (s == Season.winter ? 0.12 : 0.55)) continue;
+      final len = 2 + (n * 12).floor() + (y - 246) ~/ 14;
+      final col = n < 0.12 ? p.grass[0] : (n < 0.34 ? p.grass[1] : p.grass[2]);
+      for (var i = 0; i < len; i++) {
+        c.set(x + (i > len * 0.6 && n < 0.3 ? 1 : 0), y - i, col);
+      }
+    }
+  }
+
+  // hero blades: thick, curved, outlined, framing the left and right edges
+  final blades = <List<double>>[];
+  for (var i = 0; i < 26; i++) {
+    final left = i.isEven;
+    blades.add([
+      left ? rnd.nextDouble() * 62 - 6 : 124 + rnd.nextDouble() * 66,
+      300 + rnd.nextDouble() * 34,
+      (s == Season.winter ? 16 : 26) + rnd.nextDouble() * (s == Season.winter ? 14 : 30),
+      (left ? 1 : -1) * (0.3 + rnd.nextDouble() * 0.9), // lean toward the middle
+    ]);
+  }
+  blades.sort((a, b) => a[1].compareTo(b[1]));
+  for (final bl in blades) {
+    final light = rnd.nextDouble() > 0.5;
+    final pts = <List<int>>[];
+    for (var i = 0; i < bl[2]; i++) {
+      final t = i / bl[2];
+      pts.add([(bl[0] + bl[3] * 14 * t * t).round(), (bl[1] - i).round(), (t < 0.35 ? 3 : (t < 0.75 ? 2 : 1))]);
+    }
+    for (final pt in pts) {
+      // outline first (one pixel wider on both sides)
+      c.set(pt[0] - 1, pt[1], p.grass[3]);
+      c.set(pt[0] + pt[2], pt[1], p.grass[3]);
+    }
+    final tip = pts.last;
+    c.set(tip[0], tip[1] - 1, p.grass[3]);
+    for (final pt in pts) {
+      for (var k = 0; k < pt[2]; k++) {
+        final col = k == 0 ? p.grass[0] : (light ? p.grass[1] : p.grass[2]);
+        c.set(pt[0] + k, pt[1], col);
+      }
+    }
+  }
+
+  // flowers on stems in the foreground
+  void flower(int x, int y, int petal, int centre) {
+    for (var i = 0; i < 9; i++) {
+      c.set(x, y + 2 + i, p.grass[2]);
+    }
+    c.set(x - 1, y, petal);
+    c.set(x + 1, y, petal);
+    c.set(x, y - 1, petal);
+    c.set(x, y + 1, petal);
+    c.set(x, y, centre);
+    c.set(x - 1, y - 1, petal);
+    c.set(x + 1, y + 1, petal);
+  }
+
+  if (s == Season.summer) {
+    for (final f in [
+      [18, 282, 0xFFE8483F, 0xFF3A1A10], [52, 300, 0xFFFFFFFF, 0xFFFFD84A], [96, 286, 0xFF5B8DEF, 0xFF2E4FA8],
+      [134, 306, 0xFFE8483F, 0xFF3A1A10], [160, 290, 0xFFC7A6F2, 0xFF7A56B8], [74, 272, 0xFFFFFFFF, 0xFFFFD84A],
+      [118, 268, 0xFFFFE066, 0xFFB88A20], [176, 312, 0xFFFF9AB8, 0xFFC0506E], [36, 310, 0xFF5B8DEF, 0xFF2E4FA8],
+    ]) {
+      flower(f[0], f[1], f[2], f[3]);
+    }
+    // lavender spikes
+    for (final lx in [144, 150, 8]) {
+      for (var i = 0; i < 6; i++) {
+        c.set(lx, 276 + i * 2, 0xFF9A7AD8);
+        c.set(lx + (i.isEven ? 1 : -1), 277 + i * 2, 0xFFB79BEA);
+      }
+    }
+    // mushrooms, bottom left
+    void mushroom(int x, int y, int r) {
+      c.rect(x - 1, y, x + 1, y + r + 1, 0xFFF3E7D0);
+      c.disc(x + 0.5, y + 0.0, r.toDouble(), (px, py) => py > y ? -1 : 0xFFD8392B);
+      c.set(x - 1, y - r + 1, 0xFFFFFFFF);
+      c.set(x + 2, y - 1, 0xFFFFFFFF);
+    }
+    mushroom(12, 318, 3);
+    mushroom(20, 321, 2);
+    // butterflies
+    for (final b in [[60, 236, 0xFFFFB347], [132, 214, 0xFF8FC9FF]]) {
+      c.set(b[0], b[1], 0xFF3A2A1A);
+      c.set(b[0] - 1, b[1] - 1, b[2]);
+      c.set(b[0] + 1, b[1] - 1, b[2]);
+      c.set(b[0] - 1, b[1], b[2]);
+      c.set(b[0] + 1, b[1], b[2]);
+    }
+  } else if (s == Season.autumn) {
+    // pumpkins
+    void pumpkin(double x, double y, double r) {
+      c.disc(x, y, r, (px, py) => (px - x.floor()).abs() % 3 == 0 ? 0xFFC25A1C : 0xFFE8802A);
+      c.rect(x.floor(), (y - r - 2).floor(), x.floor() + 1, (y - r).floor(), 0xFF4E7A2E);
+    }
+    pumpkin(16, 312, 5);
+    pumpkin(28, 318, 3.5);
+    pumpkin(166, 316, 4.5);
+    // fallen leaves
+    for (var i = 0; i < 60; i++) {
+      final col = [0xFFE8702A, 0xFFB5402A, 0xFFF2C14E][rnd.nextInt(3)];
+      c.set(rnd.nextInt(w), 268 + rnd.nextInt(58), col);
+    }
+  } else {
+    // a little snowman
+    c.disc(22, 306, 7, (x, y) => x > 24 && y > 307 ? 0xFFDCE6EF : 0xFFFFFFFF);
+    c.disc(22, 294, 5, (x, y) => x > 24 && y > 295 ? 0xFFDCE6EF : 0xFFFFFFFF);
+    c.set(20, 293, 0xFF2A2A2A);
+    c.set(24, 293, 0xFF2A2A2A);
+    c.rect(22, 295, 25, 295, 0xFFE8802A); // carrot nose
+    c.rect(17, 299, 27, 300, 0xFFC0392B); // scarf
+    c.rect(24, 300, 25, 304, 0xFFC0392B);
+    c.rect(18, 287, 26, 288, 0xFF3A3A4A); // hat
+    c.rect(19, 282, 25, 287, 0xFF3A3A4A);
+  }
+  return c.px;
+}
+
+void main() {
+  for (final entry in {
+    'garden_meadow.png': Season.summer,
+    'garden_meadow_autumn.png': Season.autumn,
+    'garden_meadow_winter.png': Season.winter,
+  }.entries) {
+    final small = draw(entry.value);
+    final big = Uint32List(w * scale * h * scale);
+    for (var y = 0; y < h * scale; y++) {
+      for (var x = 0; x < w * scale; x++) {
+        big[y * w * scale + x] = small[(y ~/ scale) * w + x ~/ scale];
+      }
+    }
+    File('assets/images/backgrounds/${entry.key}').writeAsBytesSync(encodePng(big, w * scale, h * scale));
+    stdout.writeln('Wrote assets/images/backgrounds/${entry.key}');
+  }
+}
+
+List<int> encodePng(Uint32List argb, int width, int height) {
+  final raw = BytesBuilder();
+  for (var y = 0; y < height; y++) {
+    raw.addByte(0);
+    for (var x = 0; x < width; x++) {
+      final c = argb[y * width + x];
+      raw.add([(c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF]);
+    }
+  }
+  final out = BytesBuilder()..add([137, 80, 78, 71, 13, 10, 26, 10]);
+  void chunk(String type, List<int> body) {
+    final t = type.codeUnits;
+    out
+      ..add(_u32(body.length))
+      ..add(t)
+      ..add(body)
+      ..add(_u32(_crc([...t, ...body])));
+  }
+
+  chunk('IHDR', [..._u32(width), ..._u32(height), 8, 2, 0, 0, 0]); // 8-bit RGB
+  chunk('IDAT', zlib.encode(raw.toBytes()));
+  chunk('IEND', []);
+  return out.toBytes();
+}
+
+List<int> _u32(int v) => [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
+
+final _crcTable = List<int>.generate(256, (n) {
+  var c = n;
+  for (var k = 0; k < 8; k++) {
+    c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+  }
+  return c;
+});
+
+int _crc(List<int> bytes) {
+  var c = 0xFFFFFFFF;
+  for (final b in bytes) {
+    c = _crcTable[(c ^ b) & 0xFF] ^ (c >> 8);
+  }
+  return c ^ 0xFFFFFFFF;
+}

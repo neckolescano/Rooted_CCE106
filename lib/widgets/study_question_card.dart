@@ -14,11 +14,21 @@ class StudyQuestionCard extends StatefulWidget {
     required this.onSelectChoice,
     this.number,
     this.total,
+    this.onAnswered,
+    this.answered = false,
   });
+
+  /// Already answered earlier (e.g. before leaving the Study Patch): show
+  /// it as answered instead of offering a new first try.
+  final bool answered;
 
   final StudyQuestion question;
   final String? selectedChoice;
   final ValueChanged<String> onSelectChoice;
+
+  /// Called once, on the first attempt: true = answered right first try
+  /// (revealing the answer counts as not right).
+  final ValueChanged<bool>? onAnswered;
 
   /// Optional "QUESTION 2 / 5" label.
   final int? number;
@@ -29,7 +39,7 @@ class StudyQuestionCard extends StatefulWidget {
 }
 
 class _StudyQuestionCardState extends State<StudyQuestionCard> {
-  bool _revealed = false;
+  late bool _revealed = widget.answered;
 
   // Answer tile colors. Correct/wrong also get a ✓/✗ icon, so the
   // result never depends on color alone.
@@ -113,6 +123,7 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
+            if (!_revealed) widget.onAnswered?.call(isCorrectChoice);
             widget.onSelectChoice(choice);
             setState(() => _revealed = true);
           },
@@ -179,7 +190,10 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
         Semantics(
           button: true,
           child: GestureDetector(
-            onTap: () => setState(() => _revealed = true),
+            onTap: () {
+              widget.onAnswered?.call(false);
+              setState(() => _revealed = true);
+            },
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
@@ -215,8 +229,10 @@ class _StudyQuestionCardState extends State<StudyQuestionCard> {
 
   void _check(StudyQuestion q) {
     if (_typed.text.trim().isEmpty) return;
+    final correct = _matches(_typed.text, q.answer);
+    if (!_revealed) widget.onAnswered?.call(correct);
     setState(() {
-      _typedCorrect = _matches(_typed.text, q.answer);
+      _typedCorrect = correct;
       _revealed = true;
     });
   }

@@ -18,6 +18,33 @@ class NotesModel extends ChangeNotifier {
   /// the timer ended). Set once at start-up (see main.dart).
   void Function(StudyMaterial material)? onGenerated;
 
+  // Answers given in the Study Patch, kept here (not on the screen) so
+  // leaving the patch and coming back doesn't forget them. They belong to
+  // one set of material and start over when new material arrives.
+  final Map<int, bool> _firstTry = {};
+  final Map<int, String> _chosen = {};
+  StudyMaterial? _answersFor;
+
+  void _matchAnswersToMaterial() {
+    if (identical(_answersFor, material)) return;
+    _firstTry.clear();
+    _chosen.clear();
+    _answersFor = material;
+  }
+
+  /// Question index → answered right on the FIRST try (the secret
+  /// "perfect patch" is checked against this).
+  Map<int, bool> get firstTry {
+    _matchAnswersToMaterial();
+    return _firstTry;
+  }
+
+  /// Question index → the multiple-choice answer picked.
+  Map<int, String> get chosenAnswers {
+    _matchAnswersToMaterial();
+    return _chosen;
+  }
+
   void loadFrom(String savedText, {StudyMaterial? savedMaterial}) {
     text = savedText;
     material = savedMaterial;

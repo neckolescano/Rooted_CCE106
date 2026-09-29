@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/notes_model.dart';
+import '../models/plant_catalog.dart';
+import '../models/secrets.dart';
 import '../models/study_material.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compact_timer_header.dart';
 import '../widgets/desk_background.dart';
 import '../widgets/flashcard_widget.dart';
 import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
+import '../widgets/secret_found_dialog.dart';
 import '../widgets/study_question_card.dart';
 
 class StudyMaterialScreen extends StatefulWidget {
@@ -21,7 +25,6 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
   bool _showFlashcards = false;
   int _flashcardIndex = 0;
   bool _flashcardFlipped = false;
-  final Map<int, String> _selectedChoices = {};
 
   static const _shadowedCream = [Shadow(offset: Offset(0, 2), color: Color(0x99000000))];
 
@@ -130,9 +133,22 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
     );
   }
 
+  /// Secret: every question right on the first try (at least
+  /// [Secrets.perfectPatchMinQuestions]) reveals kuwago's own flower.
+  /// First tries are kept on NotesModel, so they survive leaving the patch.
+  Future<void> _recordFirstTry(int index, bool correct, int total) async {
+    final firstTry = context.read<NotesModel>().firstTry..putIfAbsent(index, () => correct);
+    if (total < Secrets.perfectPatchMinQuestions || firstTry.length < total) return;
+    if (firstTry.values.any((ok) => !ok)) return;
+    final storage = context.read<StorageService>();
+    if (!await storage.unlockSecret(Secrets.perfectPatch) || !mounted) return;
+    await showSecretSeedFound(context, plantCatalog.firstWhere((s) => s.secret == Secrets.perfectPatch));
+  }
+
   Widget _buildQuestions(List<StudyQuestion> questions) {
     if (questions.isEmpty) return _emptyMessage('No questions were generated.');
 
+    final notes = context.read<NotesModel>();
     return ListView.separated(
       itemCount: questions.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
@@ -141,8 +157,10 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
           number: index + 1,
           total: questions.length,
           question: questions[index],
-          selectedChoice: _selectedChoices[index],
-          onSelectChoice: (choice) => setState(() => _selectedChoices[index] = choice),
+          answered: notes.firstTry.containsKey(index),
+          selectedChoice: notes.chosenAnswers[index],
+          onSelectChoice: (choice) => setState(() => notes.chosenAnswers[index] = choice),
+          onAnswered: (correct) => _recordFirstTry(index, correct, questions.length),
         );
       },
     );

@@ -99,8 +99,15 @@ A species can be planted once `completedSessions ≥ unlockAtSessions`:
 | 🔥 Phoenix Bloom (Legendary) | 45 |
 | 💎 Crystal Lotus (Mythic) | 60 |
 | 👑 Golden Glory Tree (Glory) | 80 |
+| 🔔 Aurora Bell (Celestial) | 100 |
+| ⚡ Storm Orchid (Astral) | 125 |
+| 🌠 Starfall Willow (Divine) | 150 |
+| 🌹 Dragonheart Rose (Primordial) | 200 |
+| 🌸 Eternal Sakura (Eternal) | 250 |
 
-**Top-tier plants have a living aura** (`PlantSpecies.aura`, drawn by
+Rarity order: Common < Uncommon < Rare < Legendary < Mythic < Glory < Celestial < Astral < Divine < Primordial < Eternal.
+
+**Top-tier plants (Legendary and up) have a living aura** (`PlantSpecies.aura`, drawn by
 `lib/widgets/plant_aura.dart`): Phoenix Bloom has rising embers and a warm
 glow, Crystal Lotus has crystals orbiting behind and in front of the flower,
 and the Glory Tree has turning golden rays and rising motes. The aura's
@@ -161,10 +168,26 @@ number drops (for example On a Roll after giving up). File:
 | `rainy` | 🌧️ Rainy Day | finish 10 focus sessions | wash #8497A8, rain |
 | `starry` | 🌙 Starry Night | 4 sessions in a row | wash #3E4C8C, moon, twinkling stars, fireflies |
 | `forest` | ✨ Firefly Forest | grow a Forest Fern | wash #6E9A66, fireflies, drifting leaves |
+| `autumn` | 🍂 Autumn Harvest | grow 4 plants | autumn meadow picture, falling orange leaves |
+| `rainbow` | 🌈 Rainbow Morning | reach garden level 5 | light warm wash, rainbow arc |
+| `lantern` | 🏮 Lantern Night | 7 sessions in a row | wash #7A68A0, stars, floating paper lanterns |
+| `winter` | ❄️ Winter Wonderland | finish 30 focus sessions | winter meadow picture (snow, snowman), falling snow |
+| `aurora` | 🌌 Aurora Borealis | finish 50 focus sessions | wash #2C4266, stars, waving aurora curtains |
 
 - The equipped scene (`gardenScene`, synced; default `meadow`) is drawn behind the **Timer**, in the **Garden Archive** picture and through the **Home greenhouse window**.
 - Like card designs, an equipped scene stays equipped even if its quest progress later drops (e.g. the streak breaks).
 - Files: `models/garden_scenes.dart`, drawing in `widgets/garden_scene_backdrop.dart`, shelf in `widgets/garden_scene_shelf.dart`. Tests: `test/garden_scenes_test.dart`.
+
+## 8c. Secrets (hidden achievements)
+
+| Secret id | How it is found | Unlocks |
+|---|---|---|
+| `perfect_patch` | Answer **every** question in a Study Patch right on the **first try** (revealing an answer counts as wrong), with at least 5 questions | 🦉 **Owlbloom** seed (rarity *Secret*) |
+| `deep_focus` | Finish a focus session of **60 minutes or more** that was **never paused** | 🦉 **Hidden Owl Grove** scene |
+
+- Locked secrets show "???" and a hint only (seed picker, Seed Collection, scene shelf and preview). They are never offered as the "next quest".
+- The first time a secret is found, an "A secret sprouted!" popup appears (`widgets/secret_found_dialog.dart`). Finding it again does nothing.
+- Found secrets are stored as `secrets` (phone + cloud). Rules live in `lib/models/secrets.dart`; the pause flag is `SessionModel.wasPaused`.
 
 ## 9. Profile
 

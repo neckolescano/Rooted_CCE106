@@ -30,6 +30,7 @@ class _Keys {
   static const studyOptions = 'study_options';
   static const cardDesign = 'card_design';
   static const gardenScene = 'garden_scene';
+  static const secrets = 'secrets';
   static const studyMaterial = 'study_material';
   static const completedSessions = 'completed_sessions';
   static const remindersOn = 'reminders_on';
@@ -44,7 +45,7 @@ class _Keys {
     streak, totalSessions, plantStage, plantWilted, username,
     harvestedPlants, notesText, email, isGuest, memberSinceYear,
     plantSpecies, harvestLog, avatar, avatarPixel, focusMinutes, studyOptions, cardDesign,
-    studyMaterial, completedSessions, remindersOn, reminderMinutes, lastStudyDay, gardenScene, owner,
+    studyMaterial, completedSessions, remindersOn, reminderMinutes, lastStudyDay, gardenScene, secrets, owner,
   ];
 }
 
@@ -268,6 +269,8 @@ class StorageService extends ChangeNotifier {
     }
     final scene = data['gardenScene'];
     if (scene is String && scene.isNotEmpty) await _prefs.setString(_Keys.gardenScene, scene);
+    final found = data['secrets'];
+    if (found is List) await _prefs.setStringList(_Keys.secrets, [for (final f in found) f.toString()]);
     final design = data['cardDesign'];
     if (design is String && design.isNotEmpty) await _prefs.setString(_Keys.cardDesign, design);
     final minutes = data['focusMinutes'];
@@ -309,6 +312,7 @@ class StorageService extends ChangeNotifier {
         'focusMinutes': focusMinutes,
         'cardDesign': cardDesign,
         'gardenScene': gardenScene,
+        'secrets': secrets.toList(),
         // The photo itself is NOT in here on purpose — it's ~30 KB, so it's
         // only uploaded when it changes (see setAvatar), not on every sync.
         'notes': savedNotes,
@@ -524,6 +528,20 @@ class StorageService extends ChangeNotifier {
     await _prefs.setString(_Keys.gardenScene, id);
     _scheduleSync();
     notifyListeners();
+  }
+
+  /// Hidden achievements found so far (see models/secrets.dart).
+  Set<String> get secrets => (_prefs.getStringList(_Keys.secrets) ?? const []).toSet();
+
+  /// Records a secret. Returns true only the first time it is found, so the
+  /// caller can celebrate it once.
+  Future<bool> unlockSecret(String id) async {
+    final found = secrets;
+    if (found.contains(id)) return false;
+    await _prefs.setStringList(_Keys.secrets, [...found, id]);
+    _scheduleSync();
+    notifyListeners();
+    return true;
   }
 
   Future<void> setCardDesign(String id) async {

@@ -32,7 +32,7 @@ class GardenScreen extends StatelessWidget {
       completedSessions: storage.completedSessions,
       harvestedPlants: storage.harvestedPlants,
     );
-    final found = plantCatalog.where((s) => isUnlocked(s, progress.completedSessions)).length;
+    final found = plantCatalog.where((s) => isUnlocked(s, progress.completedSessions, secrets: storage.secrets)).length;
     // Which plant each harvest was, oldest first.
     final log = storage.harvestLog;
     // What the scene quests are checked against (same as Player Card quests).
@@ -44,6 +44,7 @@ class GardenScreen extends StatelessWidget {
       grownBySpecies: {
         for (final id in log) id: storage.harvestedCountOf(id),
       },
+      secrets: storage.secrets,
     );
 
     return ListView(
@@ -75,6 +76,7 @@ class GardenScreen extends StatelessWidget {
         _CollectionShelf(
           completedSessions: progress.completedSessions,
           harvestLog: log,
+          secrets: storage.secrets,
         ),
         const SizedBox(height: AppSpacing.xl),
         // Unlockable scenes: equip one to change the Timer, this garden
@@ -556,7 +558,9 @@ class _QuestCard extends StatelessWidget {
 
 /// Collectible plant cards standing on a wooden shelf. Swipe sideways.
 class _CollectionShelf extends StatelessWidget {
-  const _CollectionShelf({required this.completedSessions, required this.harvestLog});
+  const _CollectionShelf({required this.completedSessions, required this.harvestLog, this.secrets = const {}});
+
+  final Set<String> secrets;
 
   final int completedSessions;
   final List<String> harvestLog;
@@ -587,7 +591,7 @@ class _CollectionShelf extends StatelessWidget {
                   alignment: Alignment.bottomCenter,
                   child: _CollectibleCard(
                     species: species,
-                    unlocked: isUnlocked(species, completedSessions),
+                    unlocked: isUnlocked(species, completedSessions, secrets: secrets),
                     count: harvestLog.where((id) => id == species.id).length,
                   ),
                 );
@@ -617,12 +621,29 @@ class _CollectibleCard extends StatelessWidget {
         PlantRarity.legendary => const Color(0xFFC0561E),
         PlantRarity.mythic => const Color(0xFF6A3FC2),
         PlantRarity.glory => const Color(0xFFC08A1E),
+        PlantRarity.celestial => const Color(0xFF2FA58C),
+        PlantRarity.astral => const Color(0xFF4A3FB8),
+        PlantRarity.divine => const Color(0xFF8FAED6),
+        PlantRarity.primordial => const Color(0xFF7E1426),
+        PlantRarity.eternal => const Color(0xFFF28AB4),
+        PlantRarity.secret => const Color(0xFF241A3A),
       };
 
-  /// Mythic and Glory bands shimmer with a gradient instead of a flat colour.
+  /// Light bands that need dark text to stay readable.
+  static const _darkBandText = {PlantRarity.glory, PlantRarity.divine, PlantRarity.eternal};
+
+  /// Mythic and higher bands shimmer with a gradient instead of a flat colour.
   static Gradient? _rarityGradient(PlantRarity rarity) => switch (rarity) {
+        PlantRarity.secret => const LinearGradient(colors: [Color(0xFF120C24), Color(0xFF3A2A6A), Color(0xFFB8962E), Color(0xFF120C24)]),
         PlantRarity.mythic => const LinearGradient(colors: [Color(0xFF4B4FC8), Color(0xFF9B5FD6), Color(0xFF3FA3C8)]),
         PlantRarity.glory => const LinearGradient(colors: [Color(0xFFB8781A), Color(0xFFF2C94C), Color(0xFFB8781A)]),
+        PlantRarity.celestial => const LinearGradient(colors: [Color(0xFF1E8A6E), Color(0xFF3FC89A), Color(0xFF8E5CD6)]),
+        PlantRarity.astral => const LinearGradient(colors: [Color(0xFF2A2078), Color(0xFF6B4FC8), Color(0xFF3FC8F0)]),
+        PlantRarity.divine => const LinearGradient(colors: [Color(0xFFC9DEF5), Color(0xFFFFF4C2), Color(0xFFC9DEF5)]),
+        PlantRarity.primordial => const LinearGradient(colors: [Color(0xFF2A0610), Color(0xFFB02838), Color(0xFFF27A1A)]),
+        PlantRarity.eternal => const LinearGradient(colors: [
+            Color(0xFFFF8FAB), Color(0xFFFFC36B), Color(0xFFFFEB7A), Color(0xFF8FE3B0), Color(0xFF8FC2FF), Color(0xFFC39BF5),
+          ]),
         _ => null,
       };
 
@@ -630,7 +651,7 @@ class _CollectibleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String footer;
     if (!unlocked) {
-      footer = '${species.unlockAtSessions} sessions';
+      footer = species.secret != null ? 'Secret' : '${species.unlockAtSessions} sessions';
     } else {
       footer = count == 0 ? 'Ready to plant' : 'Grown ×$count';
     }
@@ -644,7 +665,7 @@ class _CollectibleCard extends StatelessWidget {
       ),
       child: Text(
         species.rarity.label.toUpperCase(),
-        style: AppTheme.body(size: 11, color: unlocked && species.rarity == PlantRarity.glory ? AppColors.textDark : AppColors.textCream, weight: FontWeight.w900).copyWith(letterSpacing: 0.5),
+        style: AppTheme.body(size: 11, color: unlocked && _darkBandText.contains(species.rarity) ? AppColors.textDark : AppColors.textCream, weight: FontWeight.w900).copyWith(letterSpacing: 0.5),
       ),
     );
 
@@ -656,7 +677,7 @@ class _CollectibleCard extends StatelessWidget {
     }
 
     return Semantics(
-      label: unlocked ? '${species.name}, ${species.rarity.label}, $footer' : 'Locked plant, unlocks at $footer',
+      label: unlocked ? '${species.name}, ${species.rarity.label}, $footer' : (species.secret != null ? 'Secret plant, locked' : 'Locked plant, unlocks at $footer'),
       excludeSemantics: true,
       child: SizedBox(
         width: _width,

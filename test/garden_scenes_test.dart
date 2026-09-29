@@ -30,6 +30,20 @@ void main() {
     expect(gardenSceneById('starry').isUnlocked(stats(streak: 3)), isFalse);
     expect(gardenSceneById('forest').isUnlocked(stats(grown: {'forest_fern': 1})), isTrue);
     expect(gardenSceneById('forest').isUnlocked(stats(harvested: 5)), isFalse);
+    expect(gardenSceneById('autumn').isUnlocked(stats(harvested: 4)), isTrue);
+    expect(gardenSceneById('lantern').isUnlocked(stats(streak: 7)), isTrue);
+    expect(gardenSceneById('winter').isUnlocked(stats(completed: 30)), isTrue);
+    expect(gardenSceneById('aurora').isUnlocked(stats(completed: 49)), isFalse);
+    expect(gardenSceneById('aurora').isUnlocked(stats(completed: 50)), isTrue);
+  });
+
+  test('there are 12 scenes (one secret); autumn and winter use their own pictures', () {
+    expect(gardenScenes, hasLength(12));
+    expect(gardenScenes.where((s) => s.secret), hasLength(1));
+    expect(gardenSceneById('autumn').asset, contains('autumn'));
+    expect(gardenSceneById('winter').asset, contains('winter'));
+    expect(gardenSceneById('aurora').effects, contains(SceneEffect.aurora));
+    expect(gardenSceneById('meadow').asset, GardenScene.meadowPicture);
   });
 
   test('quest progress is capped at the goal', () {

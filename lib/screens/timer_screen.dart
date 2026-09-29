@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garden_scenes.dart';
 import '../models/plant_model.dart';
+import '../models/secrets.dart';
 import '../models/session_model.dart';
 import '../services/reminder_service.dart';
 import '../services/storage_service.dart';
@@ -18,6 +19,7 @@ import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_timer_display.dart';
 import '../widgets/plant_aura.dart';
 import '../widgets/plant_display.dart';
+import '../widgets/secret_found_dialog.dart';
 import 'notes_screen.dart';
 
 class TimerScreen extends StatefulWidget {
@@ -172,9 +174,18 @@ class _TimerScreenState extends State<TimerScreen> {
     final session = context.read<SessionModel>();
     plant.grow();
     final studied = session.durationSeconds;
+    final deepFocus = session.wasDeepFocus;
     await storage.recordCompletedSession(durationSeconds: studied);
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
     session.markRecorded(); // the saved session can't be counted again
+
+    // Secret: a long session without a single pause reveals kuwago's grove.
+    if (deepFocus && await storage.unlockSecret(Secrets.deepFocus)) {
+      if (!mounted) return;
+      _closeEverythingOnTop();
+      await showSecretSceneFound(context, gardenScenes.firstWhere((s) => s.secret));
+      if (!mounted) return;
+    }
     // Studied today → no reminder today; the next one is tomorrow.
     if (storage.remindersOn) unawaited(ReminderService.apply(storage, plantName: plant.species.name));
 

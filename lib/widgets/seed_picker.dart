@@ -13,6 +13,7 @@ Future<String?> showSeedPicker(
   BuildContext context, {
   required String currentId,
   required int completedSessions,
+  Set<String> secrets = const {},
 }) {
   return showDialog<String>(
     context: context,
@@ -26,7 +27,7 @@ Future<String?> showSeedPicker(
             _SeedOption(
               species: species,
               selected: species.id == currentId,
-              unlocked: isUnlocked(species, completedSessions),
+              unlocked: isUnlocked(species, completedSessions, secrets: secrets),
               onTap: () => Navigator.of(dialogContext).pop(species.id),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -68,7 +69,9 @@ class _SeedOption extends StatelessWidget {
       selected: selected,
       label: unlocked
           ? '${species.name}${selected ? ', planted now' : ''}'
-          : '${species.name}, locked, unlocks at ${species.unlockAtSessions} focus sessions',
+          : species.secret != null
+              ? 'Secret plant, locked. ${species.hint ?? ''}'
+              : '${species.name}, locked, unlocks at ${species.unlockAtSessions} focus sessions',
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -106,12 +109,14 @@ class _SeedOption extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      unlocked ? species.name : '??? · ${species.category}',
+                      unlocked ? species.name : (species.secret != null ? '??? · Secret' : '??? · ${species.category}'),
                       style: AppTheme.body(size: 14, color: textColor, weight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      unlocked ? species.blurb : 'Unlocks at ${species.unlockAtSessions} focus sessions',
+                      unlocked
+                          ? species.blurb
+                          : (species.hint ?? 'Unlocks at ${species.unlockAtSessions} focus sessions'),
                       style: AppText.caption(color: unlocked ? AppColors.textMuted : AppColors.accentGold),
                     ),
                   ],

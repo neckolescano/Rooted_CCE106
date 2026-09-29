@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'secrets.dart';
 
 enum SessionStatus { idle, running, paused, completed, failed }
 
@@ -41,6 +42,13 @@ class SessionModel extends ChangeNotifier {
   /// true from the moment a session completes until TimerScreen has
   /// grown the plant and recorded it ([markRecorded]).
   bool _awaitingRecord = false;
+
+  /// true once the current session has been paused at least once.
+  bool wasPaused = false;
+
+  /// A long session finished without a single pause (the secret
+  /// "deep focus" achievement, see models/secrets.dart).
+  bool get wasDeepFocus => durationSeconds >= Secrets.deepFocusMinutes * 60 && !wasPaused;
 
   /// Seconds left on the clock right now.
   int get secondsLeft {
@@ -83,6 +91,7 @@ class SessionModel extends ChangeNotifier {
     _endsAt = DateTime.now().add(Duration(seconds: durationSeconds));
     status = SessionStatus.running;
     _awaitingRecord = false;
+    wasPaused = false;
     _runTicker();
     _save();
     notifyListeners();
@@ -94,6 +103,7 @@ class SessionModel extends ChangeNotifier {
     _endsAt = null;
     _ticker?.cancel();
     status = SessionStatus.paused;
+    wasPaused = true;
     _save();
     notifyListeners();
   }
@@ -142,6 +152,7 @@ class SessionModel extends ChangeNotifier {
     try {
       final saved = Map<String, dynamic>.from(jsonDecode(raw) as Map);
       durationSeconds = (saved['duration'] as num).toInt();
+      wasPaused = saved['pausedOnce'] == true;
       if (saved['status'] == 'running') {
         _endsAt = DateTime.fromMillisecondsSinceEpoch((saved['endsAt'] as num).toInt());
         if (!_endsAt!.isAfter(DateTime.now())) {
@@ -197,7 +208,7 @@ class SessionModel extends ChangeNotifier {
   void _save() {
     final prefs = _prefs;
     if (prefs == null) return;
-    final data = <String, Object>{'duration': durationSeconds, 'status': status.name};
+    final data = <String, Object>{'duration': durationSeconds, 'status': status.name, 'pausedOnce': wasPaused};
     if (status == SessionStatus.running) data['endsAt'] = _endsAt!.millisecondsSinceEpoch;
     if (status == SessionStatus.paused) data['left'] = _frozenLeft;
     prefs.setString(_saveKey, jsonEncode(data));

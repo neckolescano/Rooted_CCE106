@@ -37,11 +37,14 @@ class GardenSceneShelf extends StatelessWidget {
           final scene = gardenScenes[i];
           final unlocked = scene.isUnlocked(stats);
           final isEquipped = scene.id == equipped;
-          final status = isEquipped ? 'Equipped' : (unlocked ? 'Unlocked' : 'Locked, ${scene.progressLabel(stats)}');
+          final hidden = scene.secret && !unlocked;
+          final status = isEquipped
+              ? 'Equipped'
+              : (unlocked ? 'Unlocked' : (hidden ? 'Secret, locked' : 'Locked, ${scene.progressLabel(stats)}'));
           return Semantics(
             button: true,
             selected: isEquipped,
-            label: '${scene.name} scene, $status',
+            label: '${hidden ? 'Secret' : scene.name} scene, $status',
             excludeSemantics: true,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -58,14 +61,14 @@ class GardenSceneShelf extends StatelessWidget {
                           fit: StackFit.expand,
                           children: [
                             // Still pictures on the shelf (the preview moves).
-                            GardenSceneBackdrop(
+                            if (hidden) const _SecretVeil() else GardenSceneBackdrop(
                               scene: scene,
                               alignment: const Alignment(0.3, 0.2),
                               pixel: 1,
                               animate: false,
                               filterQuality: FilterQuality.medium,
                             ),
-                            if (!unlocked) const _LockVeil(),
+                            if (!unlocked && !hidden) const _LockVeil(),
                             if (isEquipped)
                               const Positioned(right: 4, top: 4, child: _CheckTag()),
                           ],
@@ -74,7 +77,7 @@ class GardenSceneShelf extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${scene.emoji} ${scene.name}',
+                      hidden ? '❔ ???' : '${scene.emoji} ${scene.name}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppText.small(color: unlocked ? AppColors.textDark : AppColors.textMuted, weight: FontWeight.w800),
@@ -89,7 +92,7 @@ class GardenSceneShelf extends StatelessWidget {
                         children: [
                           const Icon(Icons.lock, size: 11, color: AppColors.textMuted),
                           const SizedBox(width: 3),
-                          Text(scene.progressLabel(stats), style: AppText.caption()),
+                          Text(hidden ? 'Secret' : scene.progressLabel(stats), style: AppText.caption()),
                         ],
                       ),
                   ],
@@ -120,6 +123,26 @@ class _Framed extends StatelessWidget {
         decoration: BoxDecoration(border: Border.all(color: AppColors.panelDark, width: AppBorders.width)),
         child: ClipRect(child: child),
       ),
+    );
+  }
+}
+
+/// A secret scene before it is found: just a starry dark card with a "?".
+class _SecretVeil extends StatelessWidget {
+  const _SecretVeil();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF120C24), Color(0xFF2A2250), Color(0xFF1C3A3A)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text('?', style: AppTheme.pixelHeading(size: 26, color: AppColors.accentGold)),
     );
   }
 }
@@ -163,13 +186,14 @@ Future<void> showGardenScenePreview(
   final storage = context.read<StorageService>();
   final unlocked = scene.isUnlocked(stats);
   final equipped = storage.gardenScene == scene.id;
+  final hidden = scene.secret && !unlocked;
 
   return showDialog<void>(
     context: context,
     barrierColor: AppColors.overlay,
     builder: (dialogContext) => PixelDialog(
-      title: scene.name,
-      sealIcon: unlocked ? Icons.landscape : Icons.lock,
+      title: hidden ? '???' : scene.name,
+      sealIcon: unlocked ? Icons.landscape : (hidden ? Icons.help_outline : Icons.lock),
       sealColor: unlocked ? WaxSeal.green : WaxSeal.red,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -180,8 +204,11 @@ Future<void> showGardenScenePreview(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  GardenSceneBackdrop(scene: scene, alignment: const Alignment(0.3, 0.2), pixel: 1.5),
-                  if (!unlocked) const _LockVeil(),
+                  if (hidden)
+                    const _SecretVeil()
+                  else
+                    GardenSceneBackdrop(scene: scene, alignment: const Alignment(0.3, 0.2), pixel: 1.5),
+                  if (!unlocked && !hidden) const _LockVeil(),
                 ],
               ),
             ),
@@ -194,13 +221,13 @@ Future<void> showGardenScenePreview(
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            unlocked ? 'QUEST COMPLETE' : 'QUEST',
+            unlocked ? (scene.secret ? 'SECRET FOUND' : 'QUEST COMPLETE') : (hidden ? 'A SECRET SCENE' : 'QUEST'),
             textAlign: TextAlign.center,
             style: AppText.small(color: unlocked ? AppColors.greenDeep : AppColors.textMuted, weight: FontWeight.w900),
           ),
           const SizedBox(height: 4),
-          Text(scene.quest, textAlign: TextAlign.center, style: AppText.body()),
-          if (!unlocked) ...[
+          Text(hidden ? (scene.hint ?? '') : scene.quest, textAlign: TextAlign.center, style: AppText.body()),
+          if (!unlocked && !hidden) ...[
             const SizedBox(height: AppSpacing.sm),
             PixelProgressBar(
               value: scene.progress(stats),

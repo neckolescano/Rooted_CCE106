@@ -1,9 +1,12 @@
+import 'secrets.dart';
+
 /// How rare a plant is. Shown on garden cards.
-enum PlantRarity { common, uncommon, rare, legendary, mythic, glory }
+enum PlantRarity { common, uncommon, rare, legendary, mythic, glory, celestial, astral, divine, primordial, eternal, secret }
 
 /// The moving effect drawn around the top-tier plants (see
-/// widgets/plant_aura.dart): rising embers, orbiting crystals, golden rays.
-enum PlantAura { embers, prism, radiance }
+/// widgets/plant_aura.dart): rising embers, orbiting crystals, golden rays,
+/// aurora curtains, lightning, falling stars, a rune circle, rainbow halos.
+enum PlantAura { embers, prism, radiance, aurora, storm, starfall, dragon, rainbow, moonlight }
 
 extension PlantRarityLabel on PlantRarity {
   String get label => switch (this) {
@@ -13,6 +16,12 @@ extension PlantRarityLabel on PlantRarity {
         PlantRarity.legendary => 'Legendary',
         PlantRarity.mythic => 'Mythic',
         PlantRarity.glory => 'Glory',
+        PlantRarity.celestial => 'Celestial',
+        PlantRarity.astral => 'Astral',
+        PlantRarity.divine => 'Divine',
+        PlantRarity.primordial => 'Primordial',
+        PlantRarity.eternal => 'Eternal',
+        PlantRarity.secret => 'Secret',
       };
 }
 
@@ -27,6 +36,8 @@ class PlantSpecies {
     required this.assetRoot,
     required this.blurb,
     this.aura,
+    this.secret,
+    this.hint,
   });
 
   final String id;
@@ -49,6 +60,12 @@ class PlantSpecies {
 
   /// A living effect around the plant (legendary and up); null = none.
   final PlantAura? aura;
+
+  /// A secret plant is unlocked by a hidden achievement (see
+  /// models/secrets.dart) instead of a session count; until then only
+  /// [hint] is shown.
+  final String? secret;
+  final String? hint;
 
   String get fullGrownAsset => '$assetRoot/stages/fullgrown.png';
   String stageAsset(String stageName) => '$assetRoot/stages/$stageName.png';
@@ -129,6 +146,69 @@ const plantCatalog = <PlantSpecies>[
     blurb: 'A crowned tree of gold for the truest gardeners.',
     aura: PlantAura.radiance,
   ),
+  PlantSpecies(
+    id: 'aurora_bell',
+    name: 'Aurora Bell',
+    category: 'Polar',
+    rarity: PlantRarity.celestial,
+    unlockAtSessions: 100,
+    assetRoot: 'assets/images/plants/aurora_bell',
+    blurb: 'Its bells ring softly under the northern lights.',
+    aura: PlantAura.aurora,
+  ),
+  PlantSpecies(
+    id: 'storm_orchid',
+    name: 'Storm Orchid',
+    category: 'Sky',
+    rarity: PlantRarity.astral,
+    unlockAtSessions: 125,
+    assetRoot: 'assets/images/plants/storm_orchid',
+    blurb: 'Crackles with lightning whenever you stay focused.',
+    aura: PlantAura.storm,
+  ),
+  PlantSpecies(
+    id: 'starfall_willow',
+    name: 'Starfall Willow',
+    category: 'Cosmic',
+    rarity: PlantRarity.divine,
+    unlockAtSessions: 150,
+    assetRoot: 'assets/images/plants/starfall_willow',
+    blurb: 'Catches falling stars in its silver branches.',
+    aura: PlantAura.starfall,
+  ),
+  PlantSpecies(
+    id: 'dragonheart_rose',
+    name: 'Dragonheart Rose',
+    category: 'Ancient',
+    rarity: PlantRarity.primordial,
+    unlockAtSessions: 200,
+    assetRoot: 'assets/images/plants/dragonheart_rose',
+    blurb: 'A rose with an ember heart, older than any garden.',
+    aura: PlantAura.dragon,
+  ),
+  PlantSpecies(
+    id: 'eternal_sakura',
+    name: 'Eternal Sakura',
+    category: 'Timeless',
+    rarity: PlantRarity.eternal,
+    unlockAtSessions: 250,
+    assetRoot: 'assets/images/plants/eternal_sakura',
+    blurb: 'Blooms in every colour, forever. The rarest seed of all.',
+    aura: PlantAura.rainbow,
+  ),
+  // The secret seed: kuwago's own flower.
+  PlantSpecies(
+    id: 'owlbloom',
+    name: 'Owlbloom',
+    category: 'Hidden',
+    rarity: PlantRarity.secret,
+    unlockAtSessions: 0,
+    assetRoot: 'assets/images/plants/owlbloom',
+    blurb: "kuwago's own flower. It opens only for those who truly know their notes.",
+    aura: PlantAura.moonlight,
+    secret: Secrets.perfectPatch,
+    hint: 'kuwago whispers: "Know every answer by heart."',
+  ),
 ];
 
 /// The plant everyone starts with.
@@ -143,12 +223,13 @@ PlantSpecies speciesById(String? id) {
   return starterSpecies;
 }
 
-bool isUnlocked(PlantSpecies species, int completedSessions) => completedSessions >= species.unlockAtSessions;
+bool isUnlocked(PlantSpecies species, int completedSessions, {Set<String> secrets = const {}}) =>
+    species.secret != null ? secrets.contains(species.secret) : completedSessions >= species.unlockAtSessions;
 
 /// The next plant that isn't unlocked yet, or null if everything is.
 PlantSpecies? nextUnlock(int completedSessions) {
   for (final species in plantCatalog) {
-    if (completedSessions < species.unlockAtSessions) return species;
+    if (species.secret == null && completedSessions < species.unlockAtSessions) return species;
   }
   return null;
 }

@@ -58,7 +58,7 @@ class HomeScreen extends StatelessWidget {
   /// in this order (then it loops).
   List<String> _owlLines(PlantModel plant, StorageService storage, int completedSessions) {
     final name = plant.species.name;
-    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions)).length;
+    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions, secrets: storage.secrets)).length;
     return [
       if (plant.isWilted)
         'Oh no, your $name wilted… one session will perk it up!'
@@ -172,7 +172,12 @@ class _SeedTag extends StatelessWidget {
 
   Future<void> _pick(BuildContext context) async {
     final storage = context.read<StorageService>();
-    final id = await showSeedPicker(context, currentId: plant.speciesId, completedSessions: completedSessions);
+    final id = await showSeedPicker(
+      context,
+      currentId: plant.speciesId,
+      completedSessions: completedSessions,
+      secrets: storage.secrets,
+    );
     if (id == null || !plant.canChangeSpecies) return;
     plant.changeSpecies(id);
     await storage.savePlantSpecies(plant.speciesId);
@@ -182,7 +187,8 @@ class _SeedTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final canChange = plant.canChangeSpecies;
     // Only worth offering once there's more than one plant to choose.
-    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions)).length;
+    final secrets = context.select<StorageService, Set<String>>((s) => s.secrets);
+    final choices = plantCatalog.where((s) => isUnlocked(s, completedSessions, secrets: secrets)).length;
     final tappable = canChange && choices > 1;
 
     final tag = PixelPanel(

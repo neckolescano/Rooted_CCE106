@@ -14,11 +14,21 @@ void main() {
   });
 
   test('plants unlock in catalog order and ids are unique', () {
-    final unlocks = plantCatalog.map((s) => s.unlockAtSessions).toList();
+    final unlocks = plantCatalog.where((s) => s.secret == null).map((s) => s.unlockAtSessions).toList();
     expect(unlocks, [...unlocks]..sort());
     expect(plantCatalog.map((s) => s.id).toSet(), hasLength(plantCatalog.length));
     expect(nextUnlock(30)?.id, 'phoenix_bloom');
-    expect(nextUnlock(80), isNull);
+    expect(nextUnlock(80)?.id, 'aurora_bell');
+    expect(nextUnlock(250), isNull);
+  });
+
+  test('the five highest tiers sit above Glory, each with its own seed and aura', () {
+    final top = ['aurora_bell', 'storm_orchid', 'starfall_willow', 'dragonheart_rose', 'eternal_sakura'].map(speciesById);
+    expect(top.map((s) => s.rarity),
+        [PlantRarity.celestial, PlantRarity.astral, PlantRarity.divine, PlantRarity.primordial, PlantRarity.eternal]);
+    expect(top.every((s) => s.rarity.index > PlantRarity.glory.index), isTrue);
+    expect(top.map((s) => s.aura).toSet(), hasLength(5));
+    expect(top.map((s) => s.unlockAtSessions), [100, 125, 150, 200, 250]);
   });
 
   test('every plant has all its stage, wilted and frame images', () {

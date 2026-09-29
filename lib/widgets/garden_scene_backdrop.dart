@@ -30,7 +30,7 @@ class GardenSceneBackdrop extends StatefulWidget {
   final bool animate;
   final FilterQuality filterQuality;
 
-  static const meadowAsset = 'assets/images/backgrounds/garden_meadow.png';
+  static const meadowAsset = GardenScene.meadowPicture;
 
   @override
   State<GardenSceneBackdrop> createState() => _GardenSceneBackdropState();
@@ -70,7 +70,7 @@ class _GardenSceneBackdropState extends State<GardenSceneBackdrop> with SingleTi
   @override
   Widget build(BuildContext context) {
     Widget picture = Image.asset(
-      GardenSceneBackdrop.meadowAsset,
+      widget.scene.asset,
       fit: BoxFit.cover,
       alignment: widget.alignment,
       filterQuality: widget.filterQuality,
@@ -88,11 +88,13 @@ class _GardenSceneBackdropState extends State<GardenSceneBackdrop> with SingleTi
         picture,
         if (widget.scene.effects.isNotEmpty)
           RepaintBoundary(
-            child: CustomPaint(
-              painter: SceneEffectsPainter(
-                widget.scene.effects,
-                clock: widget.animate ? _clock : null,
-                pixel: widget.pixel,
+            child: ClipRect(
+              child: CustomPaint(
+                painter: SceneEffectsPainter(
+                  widget.scene.effects,
+                  clock: widget.animate ? _clock : null,
+                  pixel: widget.pixel,
+                ),
               ),
             ),
           ),
@@ -116,6 +118,9 @@ class SceneEffectsPainter extends CustomPainter {
   static final _rain = _particles(70, 7);
   static final _flies = _particles(14, 11);
   static final _leaves = _particles(10, 13);
+  static final _snow = _particles(70, 17);
+  static final _autumn = _particles(22, 19);
+  static final _lanterns = _particles(12, 23);
 
   static List<({double x, double y, double speed, double phase})> _particles(int n, int seed) {
     final r = Random(seed);
@@ -148,7 +153,8 @@ class SceneEffectsPainter extends CustomPainter {
           final r = max(p * 5, w * 0.07);
           _disc(canvas, c, r * 1.5, _paint(0xFFFFF4D6, 0.12), null);
           _disc(canvas, c, r, _paint(0xFFFFF4D6), _paint(0xFFD9CFA8));
-          canvas.drawRect(Rect.fromLTWH(_snap(c.dx - r * 0.3), _snap(c.dy - r * 0.2), p * 2, p * 2), _paint(0xFFE3D6AE));
+          canvas.drawRect(
+              Rect.fromLTWH(_snap(c.dx - r * 0.3), _snap(c.dy - r * 0.2), p * 2, p * 2), _paint(0xFFE3D6AE));
           canvas.drawRect(Rect.fromLTWH(_snap(c.dx + r * 0.2), _snap(c.dy + r * 0.3), p * 2, p), _paint(0xFFE3D6AE));
         case SceneEffect.stars:
           for (final s in _stars) {
@@ -199,6 +205,101 @@ class SceneEffectsPainter extends CustomPainter {
             canvas.drawRect(Rect.fromLTWH(x, y, p * 3, p * 1.5), paint);
             canvas.drawRect(Rect.fromLTWH(x + (flip ? 0 : p * 1.5), y - p * 1.5, p * 1.5, p * 1.5), paint);
           }
+        case SceneEffect.aurora:
+          // Two waving curtains of green and violet light in the upper sky,
+          // drawn as pixel columns that fade out downward.
+          final cw = p * 2;
+          for (var band = 0; band < 2; band++) {
+            final baseY = h * (0.08 + band * 0.1);
+            final cols = band == 0
+                ? const [0xFFB8FFE0, 0xFF5CF0A8, 0xFF2FC79A, 0xFF1F8E8A]
+                : const [0xFFEBC2FF, 0xFFB287FF, 0xFF7C6BFF, 0xFF4E7BE8];
+            for (var x = 0.0; x < w; x += cw) {
+              final u = x / w;
+              final top =
+                  baseY + sin(u * 5 + t * 0.35 * (band + 1) + band * 2) * h * 0.035 + sin(u * 11 - t * 0.5) * h * 0.012;
+              final len = h * (0.11 + 0.06 * sin(u * 7 + t * 0.6 + band));
+              final shimmer = 0.65 + 0.35 * sin(u * 23 + t * 1.3 + band);
+              for (var k = 0; k < 4; k++) {
+                final y0 = _snap(top + len * k / 4);
+                canvas.drawRect(
+                    Rect.fromLTWH(_snap(x), y0, cw, _snap(len / 4) + p), _paint(cols[k], (0.5 - k * 0.11) * shimmer));
+              }
+            }
+          }
+        case SceneEffect.snow:
+          for (final s in _snow) {
+            final fall = (s.y + t * 0.05 * s.speed) % 1.0;
+            final x = _snap((s.x * w + 16 * sin(t * 0.7 * s.speed + s.phase)) % w);
+            final y = _snap(fall * (h + 10) - 5);
+            final size = s.speed > 1.1 ? p * 2 : p;
+            canvas.drawRect(Rect.fromLTWH(x, y, size, size), _paint(0xFFFFFFFF, s.speed > 1.1 ? 0.95 : 0.7));
+          }
+        case SceneEffect.autumnLeaves:
+          const colors = [0xFFE8702A, 0xFFB5402A, 0xFFF2C14E, 0xFFD9582A];
+          for (var i = 0; i < _autumn.length; i++) {
+            final s = _autumn[i];
+            final fall = (s.y + t * 0.035 * s.speed) % 1.0;
+            final x = _snap((s.x * w + 30 * sin(t * 0.9 + s.phase) + t * 4 * s.speed) % (w + 20) - 10);
+            final y = _snap(fall * (h + 20) - 10);
+            final flip = sin(t * 2.4 + s.phase) > 0;
+            final paint = _paint(colors[i % colors.length]);
+            canvas.drawRect(Rect.fromLTWH(x, y, p * 3, p * 1.5), paint);
+            canvas.drawRect(Rect.fromLTWH(x + (flip ? 0 : p * 1.5), y - p * 1.5, p * 1.5, p * 1.5), paint);
+            canvas.drawRect(Rect.fromLTWH(x + p, y + p * 1.5, p * 0.75, p), _paint(0xFF6B3A1A));
+          }
+        case SceneEffect.lanterns:
+          // Paper lanterns drifting up into the dusk sky.
+          for (final s in _lanterns) {
+            final rise = (s.y + t * 0.012 * s.speed) % 1.0;
+            final x = _snap(s.x * w + 10 * sin(t * 0.4 * s.speed + s.phase));
+            final y = _snap(h * (0.85 - rise * 0.85));
+            final near = s.speed > 1.0;
+            final lw = near ? p * 4 : p * 3, lh = near ? p * 5 : p * 4;
+            final fade = rise > 0.8 ? (1 - rise) / 0.2 : 1.0;
+            final flicker = 0.85 + 0.15 * sin(t * 5 * s.speed + s.phase);
+            canvas.drawRect(
+                Rect.fromLTWH(x - lw * 0.5, y - lh * 0.4, lw * 2, lh * 1.8), _paint(0xFFFFB347, 0.18 * fade * flicker));
+            canvas.drawRect(Rect.fromLTWH(x, y, lw, lh), _paint(0xFFE8583A, fade));
+            canvas.drawRect(Rect.fromLTWH(x + p * 0.5, y + p, lw - p, lh - p * 2), _paint(0xFFFFC857, fade * flicker));
+            canvas.drawRect(Rect.fromLTWH(x, y - p * 0.5, lw, p * 0.5), _paint(0xFF5A2A1A, fade));
+            canvas.drawRect(Rect.fromLTWH(x, y + lh, lw, p * 0.5), _paint(0xFF5A2A1A, fade));
+          }
+        case SceneEffect.owlEyes:
+          // Pairs of glowing owl eyes watching from the trees and bushes,
+          // each blinking now and then.
+          const spots = [(0.84, 0.2), (0.9, 0.34), (0.78, 0.4), (0.07, 0.72), (0.22, 0.7), (0.9, 0.71)];
+          for (var i = 0; i < spots.length; i++) {
+            final (fx, fy) = spots[i];
+            final x = _snap(fx * w), y = _snap(fy * h);
+            final blink = sin(t * (0.7 + i * 0.13) + i * 2.1) > 0.94;
+            final glow = _paint(0xFFFFE066, 0.18 + 0.06 * sin(t * 1.5 + i));
+            canvas.drawRect(Rect.fromLTWH(x - p * 2, y - p * 2, p * 9, p * 6), glow);
+            for (final dx in [0.0, p * 3]) {
+              if (blink) {
+                canvas.drawRect(Rect.fromLTWH(x + dx, y + p, p * 2, p * 0.5), _paint(0xFFFFE066));
+              } else {
+                canvas.drawRect(Rect.fromLTWH(x + dx, y, p * 2, p * 2), _paint(0xFFFFE066));
+                canvas.drawRect(Rect.fromLTWH(x + dx + p * 0.5, y + p * 0.5, p, p), _paint(0xFF2A1A10));
+              }
+            }
+          }
+        case SceneEffect.rainbow:
+          // A soft rainbow arcing over the meadow, gently shimmering.
+          const bands = [0xFFFF6B6B, 0xFFFFA94D, 0xFFFFE066, 0xFF69DB7C, 0xFF4DABF7, 0xFF9775FA];
+          final c = Offset(w * 0.38, h * 0.56);
+          final r0 = w * 0.62;
+          final bw = max(p * 1.5, w * 0.018);
+          final shimmer = 0.4 + 0.08 * sin(t * 0.8);
+          for (var b = 0; b < bands.length; b++) {
+            final r = r0 - b * bw;
+            final steps = (pi * r / p).ceil();
+            final paint = _paint(bands[b], shimmer);
+            for (var i = 0; i <= steps; i++) {
+              final a = pi + pi * i / steps;
+              canvas.drawRect(Rect.fromLTWH(_snap(c.dx + cos(a) * r), _snap(c.dy + sin(a) * r), p, bw), paint);
+            }
+          }
       }
     }
   }
@@ -213,6 +314,5 @@ class SceneEffectsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(SceneEffectsPainter old) =>
-      old.effects != effects || old.pixel != pixel || old.clock != clock;
+  bool shouldRepaint(SceneEffectsPainter old) => old.effects != effects || old.pixel != pixel || old.clock != clock;
 }

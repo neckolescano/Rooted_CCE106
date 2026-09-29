@@ -62,6 +62,24 @@ flutter:
     - assets/images/plants/glory_tree/stages/
     - assets/images/plants/glory_tree/frames/
     - assets/images/plants/glory_tree/wilted/
+    - assets/images/plants/aurora_bell/stages/
+    - assets/images/plants/aurora_bell/frames/
+    - assets/images/plants/aurora_bell/wilted/
+    - assets/images/plants/storm_orchid/stages/
+    - assets/images/plants/storm_orchid/frames/
+    - assets/images/plants/storm_orchid/wilted/
+    - assets/images/plants/starfall_willow/stages/
+    - assets/images/plants/starfall_willow/frames/
+    - assets/images/plants/starfall_willow/wilted/
+    - assets/images/plants/dragonheart_rose/stages/
+    - assets/images/plants/dragonheart_rose/frames/
+    - assets/images/plants/dragonheart_rose/wilted/
+    - assets/images/plants/eternal_sakura/stages/
+    - assets/images/plants/eternal_sakura/frames/
+    - assets/images/plants/eternal_sakura/wilted/
+    - assets/images/plants/owlbloom/stages/
+    - assets/images/plants/owlbloom/frames/
+    - assets/images/plants/owlbloom/wilted/
 
 # ---------------------------------------------------------------------------
 # App icon. Art lives in assets/icon/ (made by tool/generate_icon.dart —

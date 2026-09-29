@@ -180,7 +180,10 @@ assets/images/
              grow_bloom_00..09, bloom_fullgrown_00..09              (128×128)
     wilted/  <stage>.png                                            (generated)
   plants/<species_id>/{stages,frames,wilted}/   same layout (generated)
-  backgrounds/garden_meadow.png  736×1308 (owner's art; timer, login, windows)
+  backgrounds/garden_meadow.png  736×1308 (original pixel art drawn by tool/generate_meadow.dart;
+                                 timer, windows, archive, card covers)
+  backgrounds/garden_meadow_autumn.png / _winter.png  seasonal versions used by the
+                                 Autumn Harvest and Winter Wonderland scenes
   buttons/button_plaque.png      96×48, 9-slice stretch zone x 50–79 (owner's art)
   popups/harvest_frame.png       144×192 scroll, "CONGRATULATIONS!" baked in (owner's art)
 assets/icon/                     generated owl icon, adaptive foreground, splash

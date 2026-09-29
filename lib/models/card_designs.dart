@@ -8,6 +8,7 @@ class QuestStats {
     required this.streak,
     required this.gardenLevel,
     required this.grownBySpecies,
+    this.secrets = const {},
   });
 
   final int completedSessions;
@@ -17,6 +18,9 @@ class QuestStats {
 
   /// How many of each plant have been grown, e.g. {'desert_cactus': 2}.
   final Map<String, int> grownBySpecies;
+
+  /// Hidden achievements found (see models/secrets.dart).
+  final Set<String> secrets;
 
   int grown(String speciesId) => grownBySpecies[speciesId] ?? 0;
 }
