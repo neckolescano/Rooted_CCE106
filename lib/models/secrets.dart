@@ -12,8 +12,8 @@ class Secrets {
   static const deepFocus = 'deep_focus';
 
   /// A perfect Study Patch needs at least this many questions.
-  static const perfectPatchMinQuestions = 1;
+  static const perfectPatchMinQuestions = 5;
 
   /// A deep-focus session must be at least this long (and never paused).
-  static const deepFocusMinutes = 1;
+  static const deepFocusMinutes = 60;
 }
