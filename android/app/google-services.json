@@ -48,6 +48,58 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:138365380070:android:094532c65fd38d9ff06227",
+        "android_client_info": {
+          "package_name": "com.nicholescano.kuwago"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "138365380070-p44mtk8lf6g9im542v1odu58nvsrt0oh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nicholescano.kuwago",
+            "certificate_hash": "b142c50d7560033cf11f9be1f8af07b55919b77b"
+          }
+        },
+        {
+          "client_id": "138365380070-pqabetm2em7r3rlh19tdi7evpmksltr0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nicholescano.kuwago",
+            "certificate_hash": "a17e5bd809e9dbd8b9717cb9a05063ce1f1150ac"
+          }
+        },
+        {
+          "client_id": "138365380070-h3spjmp3k1qdvjcgiet1odbi10vpmt5s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjrDdhIjUR-71CFDhlbNuJ5oAvgqytBM4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "138365380070-h3spjmp3k1qdvjcgiet1odbi10vpmt5s.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "138365380070-6oh8otausd6s64ejt1q3idb50ibnenmb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "yes"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

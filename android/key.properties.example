@@ -1,0 +1,7 @@
+# Copy this file to android/key.properties (git-ignored) and fill it in.
+# NEVER commit key.properties or the .jks file, and back both up somewhere
+# safe — losing the upload key means you can't update the app on Play.
+storeFile=C:/Users/YOUR_NAME/keys/kuwago-upload.jks
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyAlias=upload
+keyPassword=YOUR_KEY_PASSWORD

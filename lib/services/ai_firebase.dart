@@ -19,6 +19,23 @@ class AiFirebase {
 
   static FirebaseAppCheck get appCheck => FirebaseAppCheck.instanceFor(app: app);
 
+  static const _plainName = 'ai_plain';
+
+  /// The same AI project, but a connection that never uses App Check.
+  ///
+  /// Used only when App Check can't vouch for this install: Play Integrity
+  /// only attests apps installed from the Play Store, so test copies
+  /// (Firebase App Distribution, a shared APK) are rejected. The AI library
+  /// then refuses to send the request at all — even though App Check isn't
+  /// enforced. Requests over this connection work only while App Check is
+  /// NOT enforced for the AI project.
+  static Future<FirebaseApp> appWithoutAppCheck() async {
+    for (final a in Firebase.apps) {
+      if (a.name == _plainName) return a;
+    }
+    return Firebase.initializeApp(name: _plainName, options: app.options);
+  }
+
   /// Call once at start-up, after the main Firebase app + App Check.
   /// Uses the same App Check provider (and debug token) as the main app —
   /// register that token in the AI project too.

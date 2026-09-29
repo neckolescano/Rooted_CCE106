@@ -62,7 +62,7 @@ class AiService {
       //    the Debug Console. We still try the request either way (it
       //    works without a token while enforcement is off); if Firebase
       //    then rejects it, _explain() turns that into the App Check hint.
-      await _checkAppCheckToken();
+      _appCheckOk = await _checkAppCheckToken();
 
       // 2. Ask Gemini — retrying / switching model while it's busy, within
       //    a total time budget.
@@ -144,8 +144,12 @@ class AiService {
 
   /// One request to one model. Returns the raw reply text.
   Future<String> _ask(String modelName, String prompt, StudyOptions options) async {
-    debugPrint('[AI] sending request to $modelName (project ${AiFirebase.app.options.projectId})');
-    final model = FirebaseAI.googleAI(app: AiFirebase.app).generativeModel(
+    // Without a working App Check token the AI library won't send anything,
+    // so fall back to the connection that skips App Check (test installs).
+    final app = _appCheckOk ? AiFirebase.app : await AiFirebase.appWithoutAppCheck();
+    debugPrint('[AI] sending request to $modelName (project ${app.options.projectId}'
+        '${_appCheckOk ? '' : ', without App Check'})');
+    final model = FirebaseAI.googleAI(app: app).generativeModel(
       model: modelName,
       generationConfig: GenerationConfig(
         // Reply with raw JSON instead of prose.
@@ -182,20 +186,27 @@ class AiService {
     return null;
   }
 
-  Future<void> _checkAppCheckToken() async {
+  /// Whether the last App Check check produced a usable token.
+  bool _appCheckOk = true;
+
+  /// true = App Check gave a token (use the protected connection).
+  Future<bool> _checkAppCheckToken() async {
     try {
       final token = await AiFirebase.appCheck.getToken().timeout(_appCheckTimeout);
       if (token == null || token.isEmpty) {
         debugPrint('[AI] App Check returned NO token — requests will fail if App Check is enforced. '
             'Register the app + debug token (AI_SETUP.md).');
-      } else {
-        debugPrint('[AI] App Check token OK');
+        return false;
       }
+      debugPrint('[AI] App Check token OK');
+      return true;
     } on TimeoutException {
-      debugPrint('[AI] App Check took over ${_appCheckTimeout.inSeconds}s (slow network?) — trying anyway');
+      debugPrint('[AI] App Check took over ${_appCheckTimeout.inSeconds}s (slow network?) — trying without it');
     } catch (error) {
-      debugPrint('[AI] App Check failed: $error — trying anyway');
+      // e.g. "App attestation failed" on test installs (not from the Play Store).
+      debugPrint('[AI] App Check failed: $error — trying without it');
     }
+    return false;
   }
 
   /// The most common setup problem while developing.
