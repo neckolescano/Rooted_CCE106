@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/garden_scenes.dart';
 import '../models/plant_model.dart';
 import '../models/session_model.dart';
+import '../services/reminder_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/background_scene.dart';
@@ -13,11 +16,17 @@ import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_timer_display.dart';
+import '../widgets/plant_aura.dart';
 import '../widgets/plant_display.dart';
 import 'notes_screen.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
+
+  /// true while a Timer screen is on the stack — there must only ever be
+  /// one (two would both grow the plant and record the session).
+  static bool get isOpen => _openCount > 0;
+  static int _openCount = 0;
 
   @override
   State<TimerScreen> createState() => _TimerScreenState();
@@ -28,6 +37,12 @@ class _TimerScreenState extends State<TimerScreen> {
   bool _isGrowing = false;
   String? _growthTransitionKey;
 
+  // True from the moment a completed session starts being recorded until
+  // the next session starts. build() sees the "completed" status on every
+  // rebuild, so without this the finish (grow + record + harvest) could
+  // run twice — e.g. when the plant was already fully grown.
+  bool _finishing = false;
+
   // True only once THIS screen has actually confirmed its own start()
   // call went through. See initState() below for why this exists.
   bool _sessionStarted = false;
@@ -36,8 +51,15 @@ class _TimerScreenState extends State<TimerScreen> {
   static const _glassDark = Color(0xE63E2A1B);
 
   @override
+  void dispose() {
+    TimerScreen._openCount--;
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+    TimerScreen._openCount++;
     // This has to run inside addPostFrameCallback, NOT synchronously
     // here. SessionModel.start() calls notifyListeners(), and calling
     // that in the middle of initState() — while Flutter is still in the
@@ -57,8 +79,11 @@ class _TimerScreenState extends State<TimerScreen> {
     // we know THIS screen's own start() has actually run.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // The length picked with the FOCUS TIME setter on Home.
-      context.read<SessionModel>().start(minutes: context.read<StorageService>().focusMinutes);
+      final session = context.read<SessionModel>();
+      // A session already in progress (e.g. restored after Android closed
+      // the app, or it finished while the app was closed) is resumed —
+      // otherwise start a new one with the FOCUS TIME picked on Home.
+      if (!session.isActive) session.start(minutes: context.read<StorageService>().focusMinutes);
       setState(() => _sessionStarted = true);
     });
   }
@@ -122,7 +147,7 @@ class _TimerScreenState extends State<TimerScreen> {
   /// that animation completes. If the plant is already fully grown,
   /// there's nothing to animate, so finish right away.
   void _beginGrowthSequence() {
-    if (_isGrowing) return; // guard against firing more than once
+    if (_isGrowing || _finishing) return; // guard against firing more than once
     // Come back to this screen (from a popup or the Notes journal) so
     // the student actually sees their plant grow.
     _closeEverythingOnTop();
@@ -139,13 +164,19 @@ class _TimerScreenState extends State<TimerScreen> {
   }
 
   Future<void> _finishSession() async {
+    if (_finishing) return; // already being recorded
+    _finishing = true;
     final plant = context.read<PlantModel>();
     final storage = context.read<StorageService>();
 
+    final session = context.read<SessionModel>();
     plant.grow();
-    final studied = context.read<SessionModel>().durationSeconds;
+    final studied = session.durationSeconds;
     await storage.recordCompletedSession(durationSeconds: studied);
     await storage.savePlantState(stageIndex: plant.stage.index, wilted: plant.isWilted);
+    session.markRecorded(); // the saved session can't be counted again
+    // Studied today → no reminder today; the next one is tomorrow.
+    if (storage.remindersOn) unawaited(ReminderService.apply(storage, plantName: plant.species.name));
 
     // This covers BOTH cases: the plant just grew into its final stage
     // this session, and the plant was already fully grown when the
@@ -183,7 +214,7 @@ class _TimerScreenState extends State<TimerScreen> {
       // Dark enough that the popup is clearly the focus, but the meadow
       // still shows through faintly.
       barrierColor: AppColors.overlay,
-      builder: (_) => HarvestCelebrationDialog(plantAsset: grown.fullGrownAsset, plantName: grown.name),
+      builder: (_) => HarvestCelebrationDialog(plantAsset: grown.fullGrownAsset, plantName: grown.name, aura: grown.aura),
     );
 
     if (!mounted) return;
@@ -193,6 +224,7 @@ class _TimerScreenState extends State<TimerScreen> {
       setState(() {
         _isGrowing = false;
         _growthTransitionKey = null;
+        _finishing = false; // the new session can finish normally later
       });
       context.read<SessionModel>().start(minutes: context.read<StorageService>().focusMinutes);
     } else {
@@ -238,6 +270,8 @@ class _TimerScreenState extends State<TimerScreen> {
         backgroundColor: AppColors.background,
         body: SafeArea(
           child: BackgroundScene(
+            // The equipped Garden Scene (Garden page → Garden scenes).
+            scene: gardenSceneById(context.select<StorageService, String>((s) => s.gardenScene)),
             child: Padding(
               padding: AppSpacing.screen,
               child: Column(
@@ -304,11 +338,15 @@ class _TimerScreenState extends State<TimerScreen> {
                         final size = _plantSizeFor(constraints);
                         return Center(
                           child: _isGrowing
-                              ? GrowthTransitionPlayer(
-                                  plant: plant,
-                                  transitionKey: _growthTransitionKey!,
-                                  onFinished: _finishSession,
-                                  size: size,
+                              ? PlantAuraEffect(
+                                  aura: plant.species.aura,
+                                  strength: PlantAuraEffect.strengthForStage(plant.stage.index + 1),
+                                  child: GrowthTransitionPlayer(
+                                    plant: plant,
+                                    transitionKey: _growthTransitionKey!,
+                                    onFinished: _finishSession,
+                                    size: size,
+                                  ),
                                 )
                               : PlantDisplay(plant: plant, size: size),
                         );

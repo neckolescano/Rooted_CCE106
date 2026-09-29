@@ -93,7 +93,14 @@ class WindowZoomState extends State<WindowZoom> with TickerProviderStateMixin {
     // Phone set to "remove animations" (accessibility), or the window
     // isn't on screen: just open the page.
     if (target == null || MediaQuery.disableAnimationsOf(context)) {
-      await navigator.push(route);
+      // Still guarded: a quick double-tap must not open two Timers (two
+      // timers would both grow the plant and record the session twice).
+      _busy = true;
+      try {
+        await navigator.push(route);
+      } finally {
+        _busy = false;
+      }
       return;
     }
 

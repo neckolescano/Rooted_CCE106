@@ -1,16 +1,20 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/card_designs.dart' show QuestStats;
 import '../models/garden_progress.dart';
+import '../models/garden_scenes.dart';
 import '../models/plant_catalog.dart';
 import '../models/plant_model.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/garden_scene_shelf.dart';
 import '../widgets/pixel_dialog.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_section_header.dart';
 import '../widgets/pixel_sprite.dart';
+import '../widgets/plant_aura.dart';
 import '../widgets/plant_display.dart';
 import '../widgets/scene_frame.dart';
 
@@ -24,20 +28,35 @@ class GardenScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final storage = context.watch<StorageService>();
     final plant = context.watch<PlantModel>();
-    final progress = GardenProgress.from(
+    final progress = GardenProgress(
+      completedSessions: storage.completedSessions,
       harvestedPlants: storage.harvestedPlants,
-      plantStageIndex: plant.stage.index,
     );
     final found = plantCatalog.where((s) => isUnlocked(s, progress.completedSessions)).length;
     // Which plant each harvest was, oldest first.
     final log = storage.harvestLog;
+    // What the scene quests are checked against (same as Player Card quests).
+    final questStats = QuestStats(
+      completedSessions: progress.completedSessions,
+      harvestedPlants: storage.harvestedPlants,
+      streak: storage.streak,
+      gardenLevel: progress.level,
+      grownBySpecies: {
+        for (final id in log) id: storage.harvestedCountOf(id),
+      },
+    );
 
     return ListView(
       padding: AppSpacing.screen,
       children: [
         SizedBox(
           height: 310,
-          child: _GardenDiorama(progress: progress, harvestLog: log, plant: plant),
+          child: _GardenDiorama(
+            progress: progress,
+            harvestLog: log,
+            plant: plant,
+            scene: gardenSceneById(storage.gardenScene),
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         _StatsLedger(
@@ -57,6 +76,17 @@ class GardenScreen extends StatelessWidget {
           completedSessions: progress.completedSessions,
           harvestLog: log,
         ),
+        const SizedBox(height: AppSpacing.xl),
+        // Unlockable scenes: equip one to change the Timer, this garden
+        // picture and the view from the Home greenhouse window.
+        PixelSectionHeader(
+          'Garden scenes',
+          trailing: Text(
+            '${gardenScenes.where((s) => s.isUnlocked(questStats)).length} / ${gardenScenes.length} unlocked',
+            style: AppText.small(color: AppColors.textMuted),
+          ),
+        ),
+        GardenSceneShelf(stats: questStats),
       ],
     );
   }
@@ -67,11 +97,12 @@ class GardenScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GardenDiorama extends StatelessWidget {
-  const _GardenDiorama({required this.progress, required this.harvestLog, required this.plant});
+  const _GardenDiorama({required this.progress, required this.harvestLog, required this.plant, required this.scene});
 
   final GardenProgress progress;
   final List<String> harvestLog; // plant id per harvest, oldest first
   final PlantModel plant;
+  final GardenScene scene; // the equipped Garden Scene
 
   int get harvested => harvestLog.length;
 
@@ -88,6 +119,7 @@ class _GardenDiorama extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SceneFrame(
+      scene: scene,
       // Horizon about halfway down: sky behind the sign, grass behind the bed.
       imageAlignment: const Alignment(0.5, 0.4),
       children: [
@@ -321,7 +353,7 @@ class _HarvestedPlant extends StatelessWidget {
           sealIcon: Icons.local_florist,
           body: Column(
             children: [
-              PixelSprite(species.fullGrownAsset, size: 128),
+              PlantAuraEffect(aura: species.aura, child: PixelSprite(species.fullGrownAsset, size: 128)),
               const SizedBox(height: AppSpacing.sm),
               Text('Plant #$number', style: AppText.panelTitle(color: AppColors.textDark)),
               const SizedBox(height: AppSpacing.xs),
@@ -338,7 +370,7 @@ class _HarvestedPlant extends StatelessWidget {
             ],
           ),
         ),
-        child: PixelSprite(species.fullGrownAsset, size: size),
+        child: PlantAuraEffect(aura: species.aura, child: PixelSprite(species.fullGrownAsset, size: size)),
       ),
     );
   }
@@ -582,7 +614,16 @@ class _CollectibleCard extends StatelessWidget {
         PlantRarity.common => const Color(0xFF5E8A34),
         PlantRarity.uncommon => const Color(0xFF3F74A6),
         PlantRarity.rare => const Color(0xFF8A57B0),
-        PlantRarity.legendary => const Color(0xFFC08A1E),
+        PlantRarity.legendary => const Color(0xFFC0561E),
+        PlantRarity.mythic => const Color(0xFF6A3FC2),
+        PlantRarity.glory => const Color(0xFFC08A1E),
+      };
+
+  /// Mythic and Glory bands shimmer with a gradient instead of a flat colour.
+  static Gradient? _rarityGradient(PlantRarity rarity) => switch (rarity) {
+        PlantRarity.mythic => const LinearGradient(colors: [Color(0xFF4B4FC8), Color(0xFF9B5FD6), Color(0xFF3FA3C8)]),
+        PlantRarity.glory => const LinearGradient(colors: [Color(0xFFB8781A), Color(0xFFF2C94C), Color(0xFFB8781A)]),
+        _ => null,
       };
 
   @override
@@ -597,10 +638,13 @@ class _CollectibleCard extends StatelessWidget {
     final band = Container(
       height: 20,
       alignment: Alignment.center,
-      color: unlocked ? _rarityColor(species.rarity) : const Color(0xFF5B3E28),
+      decoration: BoxDecoration(
+        color: unlocked ? _rarityColor(species.rarity) : const Color(0xFF5B3E28),
+        gradient: unlocked ? _rarityGradient(species.rarity) : null,
+      ),
       child: Text(
         species.rarity.label.toUpperCase(),
-        style: AppTheme.body(size: 11, color: AppColors.textCream, weight: FontWeight.w900).copyWith(letterSpacing: 0.5),
+        style: AppTheme.body(size: 11, color: unlocked && species.rarity == PlantRarity.glory ? AppColors.textDark : AppColors.textCream, weight: FontWeight.w900).copyWith(letterSpacing: 0.5),
       ),
     );
 
@@ -608,7 +652,7 @@ class _CollectibleCard extends StatelessWidget {
     if (!unlocked) {
       art = Text('?', style: AppTheme.pixelHeading(size: 26, color: AppColors.accentGold.withValues(alpha: 0.7)));
     } else {
-      art = PixelSprite(species.fullGrownAsset, size: 80, zoom: 1.4);
+      art = PlantAuraEffect(aura: species.aura, zoom: 1.4, child: PixelSprite(species.fullGrownAsset, size: 80, zoom: 1.4));
     }
 
     return Semantics(

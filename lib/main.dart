@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'models/notes_model.dart';
 import 'models/plant_model.dart';
@@ -13,6 +15,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/ai_firebase.dart';
 import 'services/intro_cue.dart';
+import 'services/reminder_service.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
@@ -93,6 +96,18 @@ class _BootAppState extends State<BootApp> {
     final storage = await StorageService.create();
     final plant = PlantModel();
     final notes = NotesModel();
+    // Every newly generated study material is saved (phone + cloud).
+    notes.onGenerated = storage.saveStudyMaterial;
+    // If the user's cloud data arrives late (slow network at sign-in), put
+    // their real plant + notes on screen as soon as it does.
+    storage.onCloudDataRestored = () {
+      plant.loadFrom(
+        stageIndex: storage.savedPlantStage,
+        wilted: storage.savedPlantWilted,
+        speciesId: storage.savedPlantSpecies,
+      );
+      notes.loadFrom(storage.savedNotes, savedMaterial: storage.savedStudyMaterial);
+    };
 
     // If someone was already signed in last time, load their data from
     // the database and drop them straight into the app.
@@ -109,7 +124,20 @@ class _BootAppState extends State<BootApp> {
         wilted: storage.savedPlantWilted,
         speciesId: storage.savedPlantSpecies,
       );
-      notes.loadFrom(storage.savedNotes);
+      notes.loadFrom(storage.savedNotes, savedMaterial: storage.savedStudyMaterial);
+    }
+
+    // The ONE study timer. If Android closed the app during a session,
+    // pick it back up (MainShell then reopens the Timer); when nobody is
+    // signed in, any leftover session is dropped.
+    final session = SessionModel(prefs: await SharedPreferences.getInstance());
+    if (user != null) {
+      if (session.restore()) debugPrint('[Session] resuming a session from before the app was closed');
+      // Re-arm the daily study reminder (current plant name, today skipped
+      // if already studied). Not awaited — it mustn't slow down start-up.
+      if (storage.remindersOn) unawaited(ReminderService.apply(storage, plantName: plant.species.name));
+    } else {
+      session.reset();
     }
 
     return RootedApp(
@@ -117,6 +145,7 @@ class _BootAppState extends State<BootApp> {
       storage: storage,
       plant: plant,
       notes: notes,
+      session: session,
       startSignedIn: user != null,
     );
   }
@@ -149,12 +178,14 @@ class RootedApp extends StatelessWidget {
     required this.storage,
     required this.plant,
     required this.notes,
+    required this.session,
     required this.startSignedIn,
   });
 
   final StorageService storage;
   final PlantModel plant;
   final NotesModel notes;
+  final SessionModel session;
   final bool startSignedIn;
 
   @override
@@ -168,7 +199,7 @@ class RootedApp extends StatelessWidget {
         // Lives at the root (like PlantModel) so Timer → Notes → Study
         // Material → back never loses what was typed.
         ChangeNotifierProvider<NotesModel>.value(value: notes),
-        ChangeNotifierProvider<SessionModel>(create: (_) => SessionModel()),
+        ChangeNotifierProvider<SessionModel>.value(value: session),
       ],
       child: MaterialApp(
         title: AppInfo.name,

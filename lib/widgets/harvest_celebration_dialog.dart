@@ -1,9 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/garden_progress.dart';
+import '../models/plant_catalog.dart' show PlantAura;
 import '../theme/app_theme.dart';
 import 'pixel_button.dart';
 import 'pixel_panel.dart';
+import 'plant_aura.dart';
 
 /// Shown once a plant hits its final growth stage, using your hand-drawn
 /// scroll (its "CONGRATULATIONS!" banner is baked into the art).
@@ -24,11 +26,15 @@ class HarvestCelebrationDialog extends StatefulWidget {
     super.key,
     this.plantAsset = 'assets/images/plant/stages/fullgrown.png',
     this.plantName = 'plant',
+    this.aura,
   });
 
   /// The grown plant's sprite and name (sunflower, cactus, …).
   final String plantAsset;
   final String plantName;
+
+  /// Legendary+ plants keep their living effect in the trophy.
+  final PlantAura? aura;
 
   @override
   State<HarvestCelebrationDialog> createState() => _HarvestCelebrationDialogState();
@@ -267,20 +273,25 @@ class _HarvestCelebrationDialogState extends State<HarvestCelebrationDialog> wit
                   ScaleTransition(
                     scale: plantPop,
                     alignment: Alignment.bottomCenter,
-                    child: SizedBox(
-                      width: plantSize,
-                      height: plantSize,
-                      child: ClipRect(
-                        child: Transform.scale(
-                          scale: 1.45,
-                          alignment: const Alignment(0, 0.15),
-                          child: Image.asset(
-                            widget.plantAsset,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.none,
-                            gaplessPlayback: true,
-                            semanticLabel: 'Your fully grown ${widget.plantName}',
-                            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                    child: PlantAuraEffect(
+                      aura: widget.aura,
+                      zoom: 1.45,
+                      zoomAnchorY: 0.575,
+                      child: SizedBox(
+                        width: plantSize,
+                        height: plantSize,
+                        child: ClipRect(
+                          child: Transform.scale(
+                            scale: 1.45,
+                            alignment: const Alignment(0, 0.15),
+                            child: Image.asset(
+                              widget.plantAsset,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.none,
+                              gaplessPlayback: true,
+                              semanticLabel: 'Your fully grown ${widget.plantName}',
+                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                       ),
@@ -365,9 +376,17 @@ class _RaysAndSparklesPainter extends CustomPainter {
   // Sparkle spots around the frame, as fractions of the frame
   // (below 0 or above 1 = outside it). Third value = twinkle offset.
   static const _sparkles = [
-    [-0.16, 0.08, 0.0], [1.14, 0.14, 0.35], [-0.2, 0.46, 0.6], [1.18, 0.5, 0.15],
-    [-0.12, 0.86, 0.8], [1.12, 0.82, 0.5], [0.18, -0.1, 0.7], [0.84, -0.08, 0.25],
-    [0.5, -0.16, 0.9], [0.1, 1.06, 0.45], [0.9, 1.05, 0.05],
+    [-0.16, 0.08, 0.0],
+    [1.14, 0.14, 0.35],
+    [-0.2, 0.46, 0.6],
+    [1.18, 0.5, 0.15],
+    [-0.12, 0.86, 0.8],
+    [1.12, 0.82, 0.5],
+    [0.18, -0.1, 0.7],
+    [0.84, -0.08, 0.25],
+    [0.5, -0.16, 0.9],
+    [0.1, 1.06, 0.45],
+    [0.9, 1.05, 0.05],
   ];
 
   @override

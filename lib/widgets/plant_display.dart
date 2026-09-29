@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/plant_model.dart';
 import '../theme/app_theme.dart';
+import 'plant_aura.dart';
 
 /// Shows the plant's current pixel-art image — the drooping "wilted" art
 /// after a session was given up. If a PNG is ever missing, this shows a
@@ -13,6 +14,15 @@ class PlantDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Legendary+ plants glow, burn or sparkle — more as they grow.
+    return PlantAuraEffect(
+      aura: plant.species.aura,
+      strength: PlantAuraEffect.strengthForStage(plant.stage.index, wilted: plant.isWilted),
+      child: _art(context),
+    );
+  }
+
+  Widget _art(BuildContext context) {
     final normal = _sprite(plant.assetPath, fallback: _placeholder);
     if (!plant.isWilted) return normal;
 

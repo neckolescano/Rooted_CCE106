@@ -17,8 +17,10 @@ import 'owl_mascot.dart';
 ///           kuwago blinks. (No loading bar — the clock IS the waiting.)
 ///  DING     the app is ready: the clock bounces with a golden "ding".
 ///  OPEN     a pixel circle bursts out of the O and opens onto the app.
-///           Then the continuation:
-///             • login page → the lockup glides onto the login sign
+///           Then the continuation — kuwago leaves the clock and flies on:
+///             • login page → the letters rise up out of view and kuwago
+///                            flies to the hook on the pergola; the login
+///                            page takes over (knock, the sign drops…)
 ///             • home page  → the letters float away and kuwago flies to
 ///                            its spot on the greenhouse windowsill
 ///
@@ -62,8 +64,8 @@ class _ClockIntroState extends State<ClockIntro> with TickerProviderStateMixin {
   bool _opening = false;
 
   // Where things land (found once the app is laid out underneath).
-  Rect? _lockupTarget; // login sign
-  Rect? _owlTarget; // home windowsill
+  Rect? _owlTarget; // the login hook or the home windowsill
+  bool _toLogin = false;
   // The clock's time when the ding started (the hands sweep home from it).
   double _dingFromMinute = restMinute;
 
@@ -118,10 +120,11 @@ class _ClockIntroState extends State<ClockIntro> with TickerProviderStateMixin {
     await WidgetsBinding.instance.endOfFrame;
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    _lockupTarget = IntroCue.rectOf(IntroCue.loginLockupKey);
-    _owlTarget = _lockupTarget == null ? IntroCue.rectOf(IntroCue.homeOwlKey) : null;
+    final loginHook = IntroCue.rectOf(IntroCue.loginOwlKey);
+    _toLogin = loginHook != null;
+    _owlTarget = loginHook ?? IntroCue.rectOf(IntroCue.homeOwlKey);
     _dingFromMinute = _minuteNow();
-    debugPrint('[Intro] opening onto ${_lockupTarget != null ? 'the login page' : _owlTarget != null ? 'the home page' : 'the app'}');
+    debugPrint('[Intro] opening onto ${_toLogin ? 'the login page' : _owlTarget != null ? 'the home page' : 'the app'}');
     await _ding.forward();
     if (!mounted) return;
     await _open.forward();
@@ -198,26 +201,27 @@ class _ClockIntroState extends State<ClockIntro> with TickerProviderStateMixin {
         .reduce(max);
     final hole = farthest * Curves.easeInCubic.transform(_seg(o, 0, 0.8));
 
-    // ---- Where the lockup is (it flies onto the login sign) ----
-    final fly = Curves.easeInOutCubic.transform(_seg(o, 0.1, 0.85));
+    // ---- The letters leave: pulled up out of view (they come back on the
+    // login page's sign), or floating up and dissolving (home) ----
     Rect lockupRect = home;
     double lockupOpacity = 1;
-    if (_lockupTarget != null) {
-      lockupRect = Rect.lerp(home, _lockupTarget, fly)!;
+    if (o > 0 && _toLogin) {
+      lockupRect = home.shift(Offset(0, -(home.bottom + 20) * Curves.easeInCubic.transform(_seg(o, 0.1, 0.75))));
     } else if (o > 0) {
-      // Home: the letters float up and dissolve.
       lockupRect = home.shift(Offset(0, -36 * Curves.easeOut.transform(_seg(o, 0.1, 0.7))));
       lockupOpacity = 1 - _seg(o, 0.15, 0.6);
     }
 
-    // kuwago leaves the clock and flies to the windowsill (home only).
+    // kuwago leaves the clock and flies on: up to the login page's hook
+    // (swinging out wide) or down to the home windowsill (in an arc).
     final owlAtHome = home.topLeft + KuwagoLockup.owlRect.topLeft;
     final owlSize = KuwagoLockup.owlRect.width;
     Rect? owlFlight;
     if (_owlTarget != null && o > 0) {
       final t = Curves.easeInOutCubic.transform(_seg(o, 0.05, 0.9));
       final start = Rect.fromLTWH(owlAtHome.dx, owlAtHome.dy - dingHop, owlSize, owlSize);
-      owlFlight = Rect.lerp(start, _owlTarget, t)!.shift(Offset(0, -70 * sin(pi * t)));
+      final arc = _toLogin ? Offset(-40 * sin(pi * t), 0) : Offset(0, -70 * sin(pi * t));
+      owlFlight = Rect.lerp(start, _owlTarget, t)!.shift(arc);
     }
 
     final background = Stack(

@@ -44,6 +44,15 @@ const lavender = Ramp([0xFFF7F3FF, 0xFFD2BFF5, 0xFFA283DC, 0xFF6A4BAA]);
 const spine = Ramp([0xFFFFF6DE, 0xFFF3E3B8, 0xFFD9C28E, 0xFFB39A66], shaded: false);
 const spore = Ramp([0xFFD9A04A, 0xFFB07A2E, 0xFF8A5A1E, 0xFF5E3C12], shaded: false);
 const glow = Ramp([0xFFE8FBFF, 0xFFBFF3FF, 0xFF8FE3F5, 0xFF5CC8E0], shaded: false, outlined: false);
+// Legendary / Mythic / Glory plants.
+const fire = Ramp([0xFFFFF3B0, 0xFFFFC23D, 0xFFF27A1A, 0xFFB8321A]);
+const crimson = Ramp([0xFFFF8A7A, 0xFFE0413A, 0xFFA8232E, 0xFF6A1424]);
+const ember = Ramp([0xFFFFFBE0, 0xFFFFE27A, 0xFFFFB347, 0xFFF27A1A], shaded: false, outlined: false);
+const lotusWhite = Ramp([0xFFFFFFFF, 0xFFE6EEFF, 0xFFB9C8F5, 0xFF8A8FDC]);
+const crystal = Ramp([0xFFEFFAFF, 0xFF9CCBFF, 0xFF6A8CF0, 0xFF4B4FC8], shaded: false);
+const bark = Ramp([0xFFC89A5A, 0xFF9A6B38, 0xFF6E4722, 0xFF432A14]);
+const goldLeaf = Ramp([0xFFFFF3B8, 0xFFF5CC4C, 0xFFC8962A, 0xFF8A6418]);
+const goldGlow = Ramp([0xFFFFFFFF, 0xFFFFF4B0, 0xFFFFE066, 0xFFFFC928], shaded: false, outlined: false);
 
 // ---------------------------------------------------------------------------
 // A drawing layer: each pixel remembers its ramp + shade level, so the
@@ -332,10 +341,10 @@ void lilyFlower(Layer l, double cx, double cy, double r) {
 }
 
 /// Little 4-point twinkles (no outline, so they glow).
-void sparkle(Layer l, int x, int y) {
-  l.set(x, y, glow, 0);
+void sparkle(Layer l, int x, int y, [Ramp ramp = glow]) {
+  l.set(x, y, ramp, 0);
   for (final d in [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    l.set(x + d[0], y + d[1], glow, 1);
+    l.set(x + d[0], y + d[1], ramp, 1);
   }
 }
 
@@ -367,6 +376,234 @@ Layer lilyStage(int stage) {
       lilyBud(l, 82, 54);
       for (final s in [[44, 32], [88, 30], [46, 58], [94, 44]]) {
         sparkle(l, s[0], s[1]);
+      }
+  }
+  return l;
+}
+
+// --- Phoenix Bloom (Legendary) ---------------------------------------------
+
+/// A flickering tongue of fire rising from (cx, baseY): white-hot at the
+/// bottom, orange then red toward the tip.
+void flame(Layer l, double cx, double baseY, double height, double width, {double sway = 1.5}) {
+  for (var i = 0; i <= height; i++) {
+    final t = i / height;
+    final w = width * math.pow(1 - t, 0.7) * (t < 0.2 ? 0.7 + t * 1.5 : 1.0);
+    final x = cx + math.sin(t * math.pi * 1.6) * sway * t;
+    l.disc(x, baseY - i, math.max(0.6, w / 2), fire, t < 0.3 ? 0 : (t < 0.65 ? 1 : 2));
+  }
+}
+
+/// One wing feather: a fiery blade whose outer third burns crimson.
+void feather(Layer l, double x, double y, double angle, double length, double width, double bend) {
+  final rib = blade(l, x, y, angle, length, width, fire, bend: bend);
+  for (var i = (rib.length * 0.65).floor(); i < rib.length; i++) {
+    final t = i / (rib.length - 1);
+    final w = width * math.sin(math.pi * math.min(1, t * 1.15)) + 0.6;
+    l.disc(rib[i][0], rib[i][1], w / 2, crimson, 1);
+  }
+}
+
+Layer phoenixStage(int stage) {
+  final l = Layer();
+  switch (stage) {
+    case 1: // two leaves around a tiny glowing bud
+      blade(l, 63, 92, -28, 12, 5, leafGreen, bend: -12);
+      blade(l, 65, 92, 25, 10, 5, leafGreen, bend: 12);
+      l.line(64, 92, 64, 86, leafGreen, 2, width: 2);
+      l.ellipse(64.5, 84, 2.5, 3.5, fire, 1);
+      l.set(64, 79, ember, 1);
+    case 2: // a stem with a closed, smouldering bud
+      stem(l, 63, 92, 22, lean: 1, width: 3);
+      blade(l, 62, 92, -46, 20, 9, leafGreen, bend: -28);
+      blade(l, 66, 92, 44, 18, 9, leafGreen, bend: 28);
+      l.ellipse(64.5, 66, 4, 6, fire, 2);
+      l.ellipse(64.5, 62, 2, 2.5, crimson, 1);
+      l.set(62, 55, ember, 1);
+      l.set(68, 52, ember, 2);
+    case 3: // the bud bursts into flame, wings starting to unfold
+      stem(l, 63, 92, 34, lean: 1, width: 3);
+      blade(l, 62, 92, -50, 24, 10, leafGreen, bend: -30);
+      blade(l, 66, 92, 48, 22, 10, leafGreen, bend: 30);
+      feather(l, 63, 58, -55, 12, 6, 18);
+      feather(l, 66, 58, 55, 12, 6, -18);
+      flame(l, 64.5, 58, 16, 8);
+      l.disc(64.5, 57, 3, fire, 0);
+      for (final e in [[56, 34], [72, 30], [64, 26]]) {
+        l.set(e[0], e[1], ember, 1);
+      }
+    case 4: // full grown: a phoenix of fire with raised wings
+      stem(l, 63, 92, 40, lean: 1, width: 3);
+      blade(l, 62, 92, -52, 26, 10, leafGreen, bend: -30);
+      blade(l, 66, 92, 50, 24, 10, leafGreen, bend: 30);
+      blade(l, 64, 76, 38, 14, 7, leafGreen, bend: 20);
+      // Wings: long feathers fanning out sideways, tips curling up.
+      for (var k = 0; k < 4; k++) {
+        final a = 52.0 + k * 15, len = 30.0 - k * 3.5;
+        feather(l, 62, 52, -a, len, 8, 30);
+        feather(l, 67, 52, a, len, 8, -30);
+      }
+      flame(l, 57, 52, 14, 6, sway: -1.5);
+      flame(l, 72, 52, 14, 6);
+      flame(l, 64.5, 52, 24, 10);
+      l.disc(64.5, 51, 4.5, fire, 0);
+      for (final e in [[50, 22], [78, 18], [64, 14], [86, 30], [42, 32], [70, 10]]) {
+        sparkle(l, e[0], e[1], ember);
+      }
+  }
+  return l;
+}
+
+// --- Crystal Lotus (Mythic) --------------------------------------------------
+
+/// A floating, faceted crystal (a diamond shape, lit on the left).
+void crystalShard(Layer l, double cx, double cy, double h) {
+  final w = h * 0.6;
+  for (var y = -h; y <= h; y++) {
+    final half = w * (1 - y.abs() / h);
+    for (var x = -half; x <= half; x++) {
+      l.set((cx + x).floor(), (cy + y).floor(), crystal, x < 0 ? (y < 0 ? 0 : 1) : (y < 0 ? 1 : 2));
+    }
+  }
+  l.set((cx - w * 0.35).floor(), (cy - h * 0.35).floor(), crystal, 0);
+}
+
+/// A pointed lotus petal: white, blushing pink at the tip.
+void lotusPetal(Layer l, double x, double y, double angle, double length, double width) {
+  final rib = blade(l, x, y, angle, length, width, lotusWhite, bend: angle * 0.25);
+  for (var i = (rib.length * 0.75).floor(); i < rib.length; i++) {
+    final t = i / (rib.length - 1);
+    final w = width * math.sin(math.pi * math.min(1, t * 1.15)) + 0.6;
+    l.disc(rib[i][0], rib[i][1], w / 2, pink, 0);
+  }
+}
+
+/// A flat lily pad lying on the soil.
+void lilyPad(Layer l, double cx, double rx) {
+  l.ellipse(cx, 89, rx, 3.5, leafGreen, 1);
+  l.line(cx, 89, cx + rx * 0.7, 88, leafGreen, 2);
+}
+
+Layer lotusStage(int stage) {
+  final l = Layer();
+  switch (stage) {
+    case 1:
+      lilyPad(l, 56, 8);
+      blade(l, 66, 92, 12, 10, 4, leafGreen, bend: 8);
+    case 2:
+      lilyPad(l, 48, 11);
+      lilyPad(l, 82, 9);
+      stem(l, 63, 92, 16, width: 3);
+      l.ellipse(64.5, 73, 3, 5, lotusWhite, 1);
+      l.ellipse(64.5, 69, 1.5, 1.5, pink, 0);
+    case 3:
+      lilyPad(l, 46, 13);
+      lilyPad(l, 84, 11);
+      stem(l, 63, 92, 28, width: 3);
+      l.ellipse(64.5, 60, 5, 8.5, lotusWhite, 1);
+      l.ellipse(64.5, 53.5, 2.5, 2.5, pink, 0);
+      crystalShard(l, 86, 46, 6);
+      sparkle(l, 46, 44);
+    case 4: // full grown: an open lotus with crystals floating round it
+      lilyPad(l, 44, 14);
+      lilyPad(l, 86, 13);
+      stem(l, 63, 92, 34, width: 3);
+      blade(l, 64, 80, -30, 12, 6, leafGreen, bend: -10);
+      for (final a in [-78.0, -48.0, -18.0, 18.0, 48.0, 78.0]) {
+        lotusPetal(l, 64.5, 54, a, 21, 10);
+      }
+      for (final a in [-34.0, 0.0, 34.0]) {
+        lotusPetal(l, 64.5, 57, a, 15, 9);
+      }
+      l.disc(64.5, 53, 3, sunYellow, 0);
+      crystalShard(l, 38, 40, 8);
+      crystalShard(l, 91, 34, 7);
+      crystalShard(l, 64.5, 18, 9);
+      crystalShard(l, 88, 62, 4);
+      for (final s in [[50, 24], [80, 20], [30, 58], [100, 50]]) {
+        sparkle(l, s[0], s[1]);
+      }
+  }
+  return l;
+}
+
+// --- Golden Glory Tree (Glory) -------------------------------------------------
+
+void trunk(Layer l, double top, double baseWidth) {
+  for (var i = 0; i <= ground - top; i++) {
+    final w = baseWidth - i * (baseWidth * 0.5) / (ground - top);
+    l.disc(64 + math.sin(i * 0.15) * 0.8, ground - i.toDouble(), w / 2, bark, 1);
+  }
+}
+
+/// A round clump of golden leaves with a lit top-left.
+void goldClump(Layer l, double cx, double cy, double r) {
+  l.disc(cx, cy, r, goldLeaf, 1);
+  // Shaded underside, so overlapping clumps read as separate leaf balls.
+  for (var y = (cy + r * 0.35).floor(); y <= (cy + r).ceil(); y++) {
+    for (var x = (cx - r).floor(); x <= (cx + r).ceil(); x++) {
+      final dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+      if (dx * dx + dy * dy <= r * r) l.set(x, y, goldLeaf, 2);
+    }
+  }
+  l.disc(cx - r * 0.3, cy - r * 0.3, r * 0.45, goldLeaf, 0);
+}
+
+Layer gloryStage(int stage) {
+  final l = Layer();
+  switch (stage) {
+    case 1:
+      l.line(64, 92, 64, 80, bark, 1, width: 2);
+      blade(l, 64, 81, -45, 9, 5, goldLeaf, bend: -10);
+      blade(l, 65, 81, 42, 9, 5, goldLeaf, bend: 10);
+      sparkle(l, 64, 74, goldGlow);
+    case 2:
+      trunk(l, 68, 4);
+      for (final c in [[56.0, 68.0, 5.0], [73.0, 66.0, 5.0], [64.0, 61.0, 8.0]]) {
+        goldClump(l, c[0], c[1], c[2]);
+      }
+      sparkle(l, 50, 54, goldGlow);
+    case 3:
+      trunk(l, 58, 7);
+      l.line(64, 70, 52, 58, bark, 1, width: 3);
+      l.line(64, 66, 78, 56, bark, 1, width: 3);
+      for (final c in [[50.0, 52.0, 8.0], [79.0, 50.0, 8.0], [64.0, 44.0, 12.0], [64.0, 33.0, 8.0]]) {
+        goldClump(l, c[0], c[1], c[2]);
+      }
+      for (final g in [[56.0, 46.0], [72.0, 40.0]]) {
+        l.disc(g[0], g[1], 1.6, crimson, 0);
+      }
+      sparkle(l, 40, 36, goldGlow);
+      sparkle(l, 90, 30, goldGlow);
+    case 4: // full grown: a golden tree wearing a crown
+      trunk(l, 50, 10);
+      l.line(64, 89, 51, 92, bark, 2, width: 3);
+      l.line(64, 89, 77, 92, bark, 2, width: 3);
+      l.line(64, 62, 46, 46, bark, 1, width: 3);
+      l.line(64, 58, 83, 44, bark, 1, width: 3);
+      for (final c in [
+        [38.0, 52.0, 7.0], [90.0, 52.0, 7.0], [46.0, 44.0, 11.0], [82.0, 42.0, 11.0],
+        [64.0, 38.0, 14.0], [54.0, 28.0, 10.0], [75.0, 27.0, 10.0], [64.0, 22.0, 9.0],
+      ]) {
+        goldClump(l, c[0], c[1], c[2]);
+      }
+      for (final g in [[50.0, 40.0], [72.0, 34.0], [85.0, 48.0], [58.0, 50.0], [64.0, 27.0], [42.0, 54.0]]) {
+        l.disc(g[0], g[1], 1.7, crimson, 0);
+      }
+      // The crown on top.
+      l.rect(55, 9, 73, 13, goldLeaf, 1);
+      for (final p in [55, 64, 73]) {
+        final tall = p == 64 ? 8 : 6;
+        for (var dy = 0; dy <= tall; dy++) {
+          final half = ((tall - dy) / tall * 3).round();
+          l.rect(p - half, 9 - dy, p + half, 9 - dy, goldLeaf, dy > tall - 2 ? 0 : 1);
+        }
+      }
+      l.disc(64.5, 11, 1.6, crimson, 0);
+      l.disc(58.5, 11, 1, crimson, 0);
+      l.disc(70.5, 11, 1, crimson, 0);
+      for (final s in [[40, 22], [92, 18], [28, 40], [102, 36], [64, 0]]) {
+        sparkle(l, s[0], s[1] + 2, goldGlow);
       }
   }
   return l;
@@ -456,7 +693,7 @@ const _dryPetal = [0xFFCDB3AA, 0xFFA2827C, 0xFF7C5E5A, 0xFF4E3A38];
 ///   2. greens dry out to olive-brown, yellows go dull, pink/lavender fade
 ///   3. glowing sparkles go out
 /// The soil below row 92 is left exactly as it was.
-Uint32List wilt(Uint32List source) {
+Uint32List wilt(Uint32List source, {bool dryFire = false}) {
   var top = ground;
   for (var i = 0; i < size * size; i++) {
     if ((source[i] >> 24) != 0) {
@@ -482,13 +719,13 @@ Uint32List wilt(Uint32List source) {
       final sx = (x - lean).round();
       final sy = (y - droop - slump).round();
       if (sx < 0 || sx >= size || sy < 0 || sy > ground) continue;
-      out[y * size + x] = _dryColor(source[sy * size + sx]);
+      out[y * size + x] = _dryColor(source[sy * size + sx], dryFire: dryFire);
     }
   }
   return out;
 }
 
-int _dryColor(int argb) {
+int _dryColor(int argb, {bool dryFire = false}) {
   final a = argb >> 24 & 0xFF;
   if (a == 0) return 0;
   final r = (argb >> 16 & 0xFF) / 255, g = (argb >> 8 & 0xFF) / 255, b = (argb & 0xFF) / 255;
@@ -513,6 +750,7 @@ int _dryColor(int argb) {
   if (hue >= 70 && hue < 180) return pick(_dryGreen); // leaves, stems, cactus
   if (hue >= 45 && hue < 70) return pick(_dryYellow); // sunflower petals, flower centres
   if (hue >= 240 || hue < 15) return pick(_dryPetal); // pink / lavender petals
+  if (dryFire && s > 0.45 && hue < 45) return pick(_dryYellow); // flames and gold burn out (new plants only)
   return argb; // browns: seed, soil, spores
 }
 
@@ -523,11 +761,11 @@ int _dryColor(int argb) {
 const stageNames = ['seed', 'sprout', 'grow', 'bloom', 'fullgrown'];
 
 /// Writes <root>/wilted/<stage>.png for every stage in <root>/stages/.
-void writeWilted(String root) {
+void writeWilted(String root, {bool dryFire = false}) {
   Directory('$root/wilted').createSync(recursive: true);
   for (final name in stageNames) {
     final stage = decodePng(File('$root/stages/$name.png').readAsBytesSync());
-    File('$root/wilted/$name.png').writeAsBytesSync(encodePng(wilt(stage)));
+    File('$root/wilted/$name.png').writeAsBytesSync(encodePng(wilt(stage, dryFire: dryFire)));
   }
   stdout.writeln('Wrote $root/wilted (5 stages)');
 }
@@ -540,7 +778,13 @@ void main() {
     'desert_cactus': cactusStage,
     'forest_fern': fernStage,
     'moonpetal_lily': lilyStage,
+    'phoenix_bloom': phoenixStage,
+    'crystal_lotus': lotusStage,
+    'glory_tree': gloryStage,
   };
+
+  // Legendary+ plants: their flames and gold also dry out when wilted.
+  const rarePlants = {'phoenix_bloom', 'crystal_lotus', 'glory_tree'};
 
   for (final entry in plants.entries) {
     final root = 'assets/images/plants/${entry.key}';
@@ -562,7 +806,7 @@ void main() {
       }
     }
     stdout.writeln('Wrote $root (5 stages, 40 frames)');
-    writeWilted(root);
+    writeWilted(root, dryFire: rarePlants.contains(entry.key));
   }
 
   // Your hand-drawn sunflower gets a wilted set too (its own art is

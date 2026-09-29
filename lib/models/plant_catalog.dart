@@ -1,5 +1,9 @@
 /// How rare a plant is. Shown on garden cards.
-enum PlantRarity { common, uncommon, rare, legendary }
+enum PlantRarity { common, uncommon, rare, legendary, mythic, glory }
+
+/// The moving effect drawn around the top-tier plants (see
+/// widgets/plant_aura.dart): rising embers, orbiting crystals, golden rays.
+enum PlantAura { embers, prism, radiance }
 
 extension PlantRarityLabel on PlantRarity {
   String get label => switch (this) {
@@ -7,6 +11,8 @@ extension PlantRarityLabel on PlantRarity {
         PlantRarity.uncommon => 'Uncommon',
         PlantRarity.rare => 'Rare',
         PlantRarity.legendary => 'Legendary',
+        PlantRarity.mythic => 'Mythic',
+        PlantRarity.glory => 'Glory',
       };
 }
 
@@ -20,6 +26,7 @@ class PlantSpecies {
     required this.unlockAtSessions,
     required this.assetRoot,
     required this.blurb,
+    this.aura,
   });
 
   final String id;
@@ -39,6 +46,9 @@ class PlantSpecies {
 
   /// One cozy line shown when picking a seed.
   final String blurb;
+
+  /// A living effect around the plant (legendary and up); null = none.
+  final PlantAura? aura;
 
   String get fullGrownAsset => '$assetRoot/stages/fullgrown.png';
   String stageAsset(String stageName) => '$assetRoot/stages/$stageName.png';
@@ -88,6 +98,36 @@ const plantCatalog = <PlantSpecies>[
     unlockAtSessions: 30,
     assetRoot: 'assets/images/plants/moonpetal_lily',
     blurb: 'Said to glow for gardeners who never give up.',
+  ),
+  PlantSpecies(
+    id: 'phoenix_bloom',
+    name: 'Phoenix Bloom',
+    category: 'Fire',
+    rarity: PlantRarity.legendary,
+    unlockAtSessions: 45,
+    assetRoot: 'assets/images/plants/phoenix_bloom',
+    blurb: 'Blooms into wings of fire. Every give-up, it rises again.',
+    aura: PlantAura.embers,
+  ),
+  PlantSpecies(
+    id: 'crystal_lotus',
+    name: 'Crystal Lotus',
+    category: 'Celestial',
+    rarity: PlantRarity.mythic,
+    unlockAtSessions: 60,
+    assetRoot: 'assets/images/plants/crystal_lotus',
+    blurb: 'Crystals drift around it like tiny moons of focus.',
+    aura: PlantAura.prism,
+  ),
+  PlantSpecies(
+    id: 'glory_tree',
+    name: 'Golden Glory Tree',
+    category: 'Eternal',
+    rarity: PlantRarity.glory,
+    unlockAtSessions: 80,
+    assetRoot: 'assets/images/plants/glory_tree',
+    blurb: 'A crowned tree of gold for the truest gardeners.',
+    aura: PlantAura.radiance,
   ),
 ];
 

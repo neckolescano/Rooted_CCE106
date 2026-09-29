@@ -48,6 +48,7 @@ The rules file is **not** in the repo; it lives in the Firebase console.
 | `avatarPixel` | bool | sync | Show the photo with a "pixel look" (decoded at 40 px wide). Default true. |
 | `focusMinutes` | int | sync | FOCUS TIME on Home. Default 25. |
 | `cardDesign` | string | sync | Equipped Player Card design id. Default `meadow`. |
+| `gardenScene` | string | sync | Equipped Garden Scene id (Timer, Garden Archive, Home window). Default `meadow`. |
 | `createdAt` | timestamp | first save | Server time. **"Cozy member since" is derived from its year** when loading. |
 | `updatedAt` | timestamp | every save | Server time. |
 
@@ -84,6 +85,7 @@ The app only writes these. Nothing reads them yet.
 | `avatar_pixel` | bool | `avatarPixel` |
 | `focus_minutes` | int | `focusMinutes` |
 | `card_design` | string | `cardDesign` |
+| `garden_scene` | string | `gardenScene` |
 | `study_options` | JSON string | **local only** (not synced) |
 
 All keys are wiped on sign-out (`detachUser`, after a final push) and when a
@@ -112,6 +114,7 @@ brand-new account is created.
 - **Missing `plantSpecies`** → `wild_sunflower`. **Unknown species id** →
   `speciesById` falls back to the starter plant.
 - **Missing/invalid `cardDesign`** → `meadow` (`cardDesignById`).
+- **Missing/invalid `gardenScene`** → `meadow` (`gardenSceneById`).
 - **Missing `focusMinutes`** or a value ≤ 0 → 25.
 - **Invalid `study_options` JSON** → defaults. Counts that aren't in
   [5, 10, 15, 20] → 5.

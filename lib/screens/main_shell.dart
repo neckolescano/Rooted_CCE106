@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/session_model.dart';
+import '../services/intro_cue.dart';
 import '../widgets/pixel_bottom_nav.dart';
 import '../widgets/window_zoom.dart';
 import 'home_screen.dart';
 import 'garden_screen.dart';
 import 'profile_screen.dart';
+import 'timer_screen.dart';
 
 /// Holds the bottom nav bar and swaps between the 3 main tabs.
 /// IndexedStack keeps each screen's state alive when you switch tabs
@@ -17,6 +21,33 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reopenUnfinishedSession());
+  }
+
+  /// If Android closed the app during a study session (or it finished
+  /// while the app was closed), go straight back to the Timer — after the
+  /// opening has finished, so the student sees Home for a moment first.
+  void _reopenUnfinishedSession() {
+    if (!mounted || !context.read<SessionModel>().isActive) return;
+    if (IntroCue.stage.value != IntroStage.done) {
+      void onStage() {
+        if (IntroCue.stage.value != IntroStage.done) return;
+        IntroCue.stage.removeListener(onStage);
+        _reopenUnfinishedSession();
+      }
+
+      IntroCue.stage.addListener(onStage);
+      return;
+    }
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || !context.read<SessionModel>().isActive || TimerScreen.isOpen) return;
+      Navigator.of(context).push(WindowZoom.throughWindowRoute<void>(const TimerScreen()));
+    });
+  }
 
   final _screens = const [
     HomeScreen(),

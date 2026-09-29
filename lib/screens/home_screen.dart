@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/garden_progress.dart';
 import '../models/plant_catalog.dart';
 import '../models/plant_model.dart';
+import '../models/session_model.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/focus_time_setter.dart';
@@ -13,6 +14,7 @@ import '../widgets/pixel_progress_bar.dart';
 import '../widgets/page_entrance.dart';
 import '../widgets/seed_picker.dart';
 import '../widgets/window_zoom.dart';
+import 'notes_screen.dart';
 import 'timer_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -22,6 +24,7 @@ class HomeScreen extends StatelessWidget {
   static final _windowKey = GlobalKey(debugLabel: 'greenhouseWindow');
 
   void _startSession(BuildContext context) {
+    if (TimerScreen.isOpen) return; // never two timers
     final zoom = WindowZoom.maybeOf(context);
     final route = WindowZoom.throughWindowRoute<void>(const TimerScreen());
     if (zoom == null) {
@@ -79,9 +82,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final plant = context.watch<PlantModel>();
     final storage = context.watch<StorageService>();
-    final progress = GardenProgress.from(
+    final progress = GardenProgress(
+      completedSessions: storage.completedSessions,
       harvestedPlants: storage.harvestedPlants,
-      plantStageIndex: plant.stage.index,
     );
 
     // Entrance: the header drops in, the greenhouse fades up (kuwago is
@@ -119,6 +122,9 @@ class HomeScreen extends StatelessWidget {
                       top: 6,
                       child: _SeedTag(plant: plant, completedSessions: progress.completedSessions),
                     ),
+                    // Journal tag: read/edit your notes and open your saved
+                    // study patch any time, not only during a session.
+                    const Positioned(right: 6, top: 6, child: _JournalTag()),
                   ],
                 ),
               ),
@@ -143,7 +149,10 @@ class HomeScreen extends StatelessWidget {
               from: 0.58,
               to: 0.95,
               child: PixelButton(
-                label: 'Start Study Session',
+                // Rebuilds only when a session starts or ends (not every tick).
+                label: context.select<SessionModel, bool>((s) => s.isActive)
+                    ? 'Return to Session'
+                    : 'Start Study Session',
                 onPressed: () => _startSession(context),
               ),
             ),
@@ -211,6 +220,47 @@ class _SeedTag extends StatelessWidget {
         onTap: () => _pick(context),
         // Extra invisible padding so the small tag is still easy to tap.
         child: Padding(padding: const EdgeInsets.all(4), child: tag),
+      ),
+    );
+  }
+}
+
+/// Little dark tag in the greenhouse's other corner: "📖 JOURNAL". Opens
+/// the Study Journal (notes, generating study material, the saved study
+/// patch) outside of a study session too.
+class _JournalTag extends StatelessWidget {
+  const _JournalTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Open your study journal',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotesScreen())),
+        // Extra invisible padding so the small tag is still easy to tap.
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: PixelPanel(
+            style: PanelStyle.dark,
+            backgroundColor: const Color(0xE63E2A1B),
+            expand: false,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.menu_book, size: 14, color: AppColors.accentGold),
+                const SizedBox(width: 6),
+                Text(
+                  'JOURNAL',
+                  style: AppText.caption(color: AppColors.accentGold).copyWith(fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

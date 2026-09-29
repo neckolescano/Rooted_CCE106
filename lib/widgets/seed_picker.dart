@@ -5,6 +5,7 @@ import 'pixel_button.dart';
 import 'pixel_dialog.dart';
 import 'pixel_panel.dart';
 import 'pixel_sprite.dart';
+import 'plant_aura.dart';
 
 /// Opens the "Choose a seed" scroll. Returns the picked plant id, or null
 /// if the student closed it without choosing.
@@ -90,7 +91,11 @@ class _SeedOption extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   child: Center(
                     child: unlocked
-                        ? PixelSprite(species.fullGrownAsset, size: 46, zoom: 1.5)
+                        ? PlantAuraEffect(
+                            aura: species.aura,
+                            zoom: 1.5,
+                            child: PixelSprite(species.fullGrownAsset, size: 46, zoom: 1.5),
+                          )
                         : const Icon(Icons.lock, size: 20, color: AppColors.accentGold),
                   ),
                 ),

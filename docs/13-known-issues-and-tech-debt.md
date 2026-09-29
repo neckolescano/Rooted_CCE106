@@ -33,10 +33,42 @@ come back.
 | K20 | **Package and ids still say `rooted`** (Dart package, application id `com.example.rooted`, main Firebase project). | Cosmetic, but `com.example.*` can't be published to the Play Store. | Q14. |
 | K21 | **MFA requirement:** Firebase console accounts need MFA from **Oct 20, 2026**. | The owner could lose console access. | Turn on 2-step verification on both Google accounts. |
 | K22 | **Only offline-maker tests exist.** | No widget or model tests for growth, XP or storage. | Add tests for `GardenProgress`, `PlantModel`, `StudyOptions`, `StudyQuestion` parsing. |
-| K24 | **Animated splash hand-off not yet tested on a device.** `MainActivity.kt` sends Flutter the splash icon's exact position, so the navigation bar is accounted for. The Kotlin code couldn't be compiled in the assistant's environment (Gradle blocked); the XML resources were validated with aapt2. | If the Kotlin fails to build, the owner will see a build error. | Check the first phone run. |
+| K24 | **Animated splash hand-off: the app builds and runs on the owner's phone (2026-09-29), so `MainActivity.kt` compiles; the visual hand-off is still to be confirmed.** `MainActivity.kt` sends Flutter the splash icon's exact position, so the navigation bar is accounted for. The Kotlin code couldn't be compiled in the assistant's environment (Gradle blocked); the XML resources were validated with aapt2. | If the Kotlin fails to build, the owner will see a build error. | Check the first phone run. |
 | K25 | **`flutter_native_splash:create` overwrites the Android 12 styles.** | The animated icon would be replaced by the still image. | Always run `dart run tool/generate_splash_anim.dart` straight after it (noted in `pubspec.yaml`). |
 | K26 | **Early bug:** the first packet opening skipped its animation when the phone's animation scale was off (Flutter reads that as "reduce motion"). | The owner saw no tear. | Fixed: the opening always plays (it no longer checks reduce-motion). |
 | K23 | **Stale docs.** `AI_SETUP.md` troubleshooting and the "model not found" developer hint in `AiService._explain` both say to change `_modelName`, but the code uses the `_models` list. `FIREBASE_SETUP.md` and `REDESIGN_PLAN.md` predate the rename. | Could confuse a new developer. | Update the wording. |
+
+### Fixed after the 2026-09-29 audit (Priority 1)
+
+| Audit bug | Fix | Files |
+|---|---|---|
+| 1 — slow sign-in could overwrite cloud data with defaults | Local data is tagged with its owner uid; uploads are paused until the user's cloud data has really loaded (background retries 3 s → 60 s), then plant + notes reload (`onCloudDataRestored`) | `services/storage_service.dart`, `main.dart` |
+| 2 — sign-out could fail halfway | Upload pending → sign out → only then wipe the phone; a failure shows a message and wipes nothing | `screens/profile_screen.dart`, `services/storage_service.dart` (`syncNow`, `detachUser(push:)`) |
+| 3 — Google Sign-In `initialize()` on every tap; cancel showed a generic error | Initialized once (shared future); Google sign-out only for Google accounts and never blocks Firebase sign-out; cancel → "Sign-in was cancelled." | `services/auth_service.dart` |
+| 4 — two Timers when animations are off | The no-animation path uses the same double-tap guard | `widgets/window_zoom.dart` |
+| 5 — a finished session could be recorded twice | `_finishing` flag | `screens/timer_screen.dart` |
+| 11 — login could stay invisible if the opening never finished | 6 s fallback starts the entrance anyway | `screens/login_screen.dart` |
+
+### Fixed after the audit (Priority 2)
+
+| Audit bug | Fix | Files |
+|---|---|---|
+| 6 — name dialog disposed its controller while still closing | The dialog is its own widget that owns the controller | `screens/profile_screen.dart` |
+| 7 — timer lost when Android closed the app; drift/doze stalls | `SessionModel` keeps the END time (`endsAt`) and saves the active session on the phone; on reopening, `MainShell` goes back to the Timer, and a session that ended while closed still counts (once — `markRecorded`). Home shows "Return to Session". Only one Timer can be open (`TimerScreen.isOpen`). Tests: `test/session_model_test.dart` | `models/session_model.dart`, `main.dart`, `screens/timer_screen.dart`, `screens/main_shell.dart`, `screens/home_screen.dart` |
+| 8 — generated study material lost | Saved on the phone + in Firestore (`studyMaterial`, uploaded on its own), reloaded on sign-in/restart; saved from the model, so it survives the Notes screen closing mid-generation; "Open Study Patch" button in the journal; a failed try keeps the old material. Test: `test/study_material_test.dart` | `models/study_material.dart`, `models/notes_model.dart`, `services/storage_service.dart`, `screens/notes_screen.dart`, `main.dart`, `screens/login_screen.dart` |
+| 12 — XP/level/unlocks/badges used an estimate | Real `completedSessions` counter; older accounts seeded once from the old estimate (so nobody drops a level) | `services/storage_service.dart`, `models/garden_progress.dart`, Home/Garden/Profile |
+| 13 — two phones overwrote each other's counts | `totalSessions`, `completedSessions`, `harvestedPlants` go to Firestore as `+1` increments (`CloudService.increment`); they're only written whole when the document is created. (The streak and harvest list are still whole values — last write wins.) | `services/cloud_service.dart`, `services/storage_service.dart` |
+| Rules not in the repo | `firestore.rules` + `firebase.json` → deploy with `firebase deploy --only firestore:rules` | `firestore.rules`, `firebase.json` |
+
+### Fixed after the audit (Priority 3)
+
+| Audit bug | Fix | Files |
+|---|---|---|
+| 10 — "Flashcards only" opened on an empty Questions tab | The Study Patch opens on the tab that has content | `screens/study_material_screen.dart` |
+| K22 — few tests | 26 tests now: sync safety rules with a fake cloud (`test/storage_sync_test.dart` — slow first load never uploads defaults, other accounts' leftovers never uploaded, +1 counters, one-time counter seeding, sign-out), timer persistence, study material round-trip, reminder settings, study log, offline study maker. `StorageService` takes an optional `cloudFor` stand-in for tests | `test/`, `services/storage_service.dart`, `pubspec.yaml` (dev: fake_async) |
+| Session log was write-only (K19) | **Study Log** screen (Profile → Study Log): this week's focus time / finished / gave up, then recent sessions (last 60) grouped by day; loading, empty and error + Try again states; offline-saved sessions use Firestore's estimated time. Tests: `test/session_log_test.dart` | `models/session_log.dart`, `services/cloud_service.dart` (`recentSessions`), `services/storage_service.dart` (`loadSessionHistory`), `screens/study_log_screen.dart`, `screens/profile_screen.dart` |
+| Push Reminders was UI only | Real daily study reminder (`services/reminder_service.dart`, flutter_local_notifications + timezone): permission asked when switched on (Android 13+), time picker ("Reminder time", default 7:00 PM), skipped on days with a finished session, re-armed at start-up and after reboots, cancelled on sign-out; white owl status-bar icon `ic_stat_kuwago` (tool/generate_icon.dart). Settings are per phone. Needs: core library desugaring + manifest permissions/receivers. Test: `test/reminder_settings_test.dart` | `services/reminder_service.dart`, `services/storage_service.dart`, `screens/profile_screen.dart`, `screens/timer_screen.dart`, `main.dart`, `android/app/build.gradle.kts`, `AndroidManifest.xml`, `pubspec.yaml` |
+| 9 — the journal was only reachable during a session | "📖 JOURNAL" tag in the greenhouse's top-right corner on Home opens the Study Journal any time (notes, generating, the saved study patch); the journal's session bar hides itself when no session is running | `screens/home_screen.dart`, `widgets/compact_timer_header.dart`, `screens/notes_screen.dart`, `screens/study_material_screen.dart` |
 
 ## 2. Harmless things that look like problems
 
@@ -50,12 +82,9 @@ come back.
 
 ## 3. Tech debt / cleanup candidates
 
-- **Unused files** (ask the owner before deleting):
-  - `lib/widgets/sparkle_overlay.dart` (replaced by the new harvest effects)
-  - `lib/widgets/plant_widget.dart`
-  - `lib/widgets/timer_controls.dart`
-  - `lib/models/plant_state.dart`
-  - `lib/services/pomodoro_timer.dart`
+- ~~Unused files~~ — deleted with the owner's OK (2026-09-29): `sparkle_overlay`,
+  `plant_widget`, `timer_controls`, `plant_state`, `pomodoro_timer`, and the
+  login preview files (`lib/preview/`, `lib/dev_preview.dart`).
 - **Spec widgets folded into others:** `PixelStepper`, `PixelChoiceChips`
   and `PixelToast` were never built as separate widgets. If more screens
   need them, extract them from `focus_time_setter.dart` and

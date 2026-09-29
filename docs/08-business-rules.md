@@ -96,6 +96,20 @@ A species can be planted once `completedSessions ≥ unlockAtSessions`:
 | Desert Cactus | 10 |
 | Forest Fern | 20 |
 | Moonpetal Lily | 30 |
+| 🔥 Phoenix Bloom (Legendary) | 45 |
+| 💎 Crystal Lotus (Mythic) | 60 |
+| 👑 Golden Glory Tree (Glory) | 80 |
+
+**Top-tier plants have a living aura** (`PlantSpecies.aura`, drawn by
+`lib/widgets/plant_aura.dart`): Phoenix Bloom has rising embers and a warm
+glow, Crystal Lotus has crystals orbiting behind and in front of the flower,
+and the Glory Tree has turning golden rays and rising motes. The aura's
+strength grows with the stage (seed 0 → full grown 100%) and goes out while
+the plant is wilted. It's shown on the Timer (including the growth
+animation), the Garden Archive, the Home window, the collection cards, the
+seed picker and the harvest trophy. Mythic and Glory cards have gradient
+rarity bands. Art: `tool/generate_plants.dart` (flames and gold dry to
+brown when wilted).
 
 The Garden "next quest" card shows `nextUnlock(completedSessions)`. File:
 `lib/models/plant_catalog.dart`.
@@ -136,6 +150,21 @@ number drops (for example On a Roll after giving up). File:
   until the quest is met again. Not yet confirmed by the owner (Q10).
 - File: `lib/models/card_designs.dart`; drawing in
   `lib/widgets/card_cover.dart`.
+
+## 8b. Garden Scenes (Garden page → Garden scenes)
+
+| id | Scene | Quest | Look |
+|---|---|---|---|
+| `meadow` | 🌿 Morning Meadow | starter | the normal meadow |
+| `sunset` | 🌇 Golden Sunset | finish 3 focus sessions | wash #FFB27A, low sun with a glow |
+| `cherry` | 🌸 Cherry Blossom | grow 2 plants | wash #FFD6E4, falling petals |
+| `rainy` | 🌧️ Rainy Day | finish 10 focus sessions | wash #8497A8, rain |
+| `starry` | 🌙 Starry Night | 4 sessions in a row | wash #3E4C8C, moon, twinkling stars, fireflies |
+| `forest` | ✨ Firefly Forest | grow a Forest Fern | wash #6E9A66, fireflies, drifting leaves |
+
+- The equipped scene (`gardenScene`, synced; default `meadow`) is drawn behind the **Timer**, in the **Garden Archive** picture and through the **Home greenhouse window**.
+- Like card designs, an equipped scene stays equipped even if its quest progress later drops (e.g. the streak breaks).
+- Files: `models/garden_scenes.dart`, drawing in `widgets/garden_scene_backdrop.dart`, shelf in `widgets/garden_scene_shelf.dart`. Tests: `test/garden_scenes_test.dart`.
 
 ## 9. Profile
 

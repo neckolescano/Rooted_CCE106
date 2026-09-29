@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../models/session_log.dart';
 
 /// Talks to Cloud Firestore for ONE signed-in user. All of that user's
 /// data lives under a single document, `users/{uid}`, plus a
@@ -38,6 +39,47 @@ class CloudService {
       if (isNew) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  /// Adds to counters in the user document (e.g. {'totalSessions': 1}).
+  /// "+1" instead of writing the whole number means two phones can never
+  /// overwrite each other's counts, and offline increments queue up and
+  /// all arrive later. Never throws.
+  Future<void> increment(Map<String, int> by) async {
+    try {
+      await _userDoc.set({
+        for (final entry in by.entries) entry.key: FieldValue.increment(entry.value),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 5));
+    } catch (error) {
+      // Offline: Firestore keeps the increment queued and sends it later.
+      debugPrint('Counter update did not finish: $error');
+    }
+  }
+
+  /// The most recent sessions from the log, newest first. Throws if they
+  /// can't be loaded (the Study Log screen shows an error + Try again).
+  Future<List<SessionLogEntry>> recentSessions({int limit = 60}) async {
+    final snap = await _userDoc
+        .collection('sessions')
+        .orderBy('endedAt', descending: true)
+        .limit(limit)
+        // Sessions saved while offline don't have their server time yet —
+        // "estimate" gives the phone's time instead of null.
+        .get(const GetOptions(serverTimestampBehavior: ServerTimestampBehavior.estimate))
+        .timeout(const Duration(seconds: 10));
+    return [
+      for (final doc in snap.docs)
+        () {
+          final data = doc.data();
+          final ended = data['endedAt'];
+          return SessionLogEntry(
+            completed: data['completed'] == true,
+            seconds: (data['seconds'] as num?)?.toInt() ?? 0,
+            endedAt: ended is Timestamp ? ended.toDate() : DateTime.now(),
+          );
+        }(),
+    ];
   }
 
   /// Adds one document to the sessions log. Never throws — a failed log

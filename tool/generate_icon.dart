@@ -51,6 +51,37 @@ void main() {
   _write('assets/icon/splash_logo.png', 768, canvas(768, background: null, fill: 0.62));
   _write('assets/icon/splash_lockup.png', _splashSize, _lockupSplash());
   stdout.writeln('Wrote assets/icon/app_icon.png, app_icon_foreground.png, splash_logo.png, splash_lockup.png');
+  _writeNotificationIcons();
+}
+
+// --- Notification icon (study reminders) --------------------------------------
+// Android draws status-bar icons as a one-colour silhouette, so the colourful
+// app icon would just be a white blob. This is kuwago as a white silhouette
+// with its eyes cut out, at 24 dp in each screen density (1 art pixel = 1 dp):
+//   android/app/src/main/res/drawable-<density>/ic_stat_kuwago.png
+
+void _writeNotificationIcons() {
+  final owl = owlRows(perch: false);
+  const densities = {'mdpi': 1, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4};
+  densities.forEach((name, scale) {
+    final size = owlGrid * scale;
+    final out = Uint32List(size * size);
+    for (var y = 0; y < owlGrid; y++) {
+      for (var x = 0; x < owlGrid; x++) {
+        final ch = owl[y][x];
+        // Eye whites + pupils become holes, so it still reads as an owl.
+        if (owlColors[ch] == null || ch == 'w' || ch == 'e') continue;
+        for (var dy = 0; dy < scale; dy++) {
+          final row = (y * scale + dy) * size;
+          out.fillRange(row + x * scale, row + x * scale + scale, 0xFFFFFFFF);
+        }
+      }
+    }
+    final dir = 'android/app/src/main/res/drawable-$name';
+    Directory(dir).createSync(recursive: true);
+    _write('$dir/ic_stat_kuwago.png', size, out);
+  });
+  stdout.writeln('Wrote the ic_stat_kuwago notification icons');
 }
 
 // --- Launch splash: the kuwaGO lockup (kuwago perched on the clock O) --------

@@ -1,24 +1,19 @@
 import 'plant_model.dart';
 
-/// Garden level + XP, worked out from numbers the app already saves.
-/// Nothing here is stored — it's recalculated every time, so tuning the
-/// numbers below instantly re-levels everyone.
-///
-/// TEMPORARY SHORTCUT: the app doesn't save a "completed sessions" count
-/// yet (totalSessions also counts given-up ones). But every completed
-/// session grows the plant exactly one stage, and each harvested plant
-/// took 4 stages, so:
-///     completed = harvested × 4 + current stage
-/// The garden progression phase replaces this with a real saved counter.
+/// Garden level + XP, worked out from the saved counters
+/// (StorageService.completedSessions / harvestedPlants). Nothing here is
+/// stored — it's recalculated every time, so tuning the numbers below
+/// instantly re-levels everyone.
 class GardenProgress {
   const GardenProgress({required this.completedSessions, required this.harvestedPlants});
 
-  factory GardenProgress.from({required int harvestedPlants, required int plantStageIndex}) {
+  /// Only for accounts from before the real counter existed: every
+  /// completed session grows the plant one stage and a harvest takes 4,
+  /// so completed ≈ harvested × 4 + current stage. Used ONCE to seed the
+  /// counter (see StorageService), never for display.
+  static int estimateCompleted({required int harvestedPlants, required int plantStageIndex}) {
     final stagesPerPlant = GrowthStage.values.length - 1; // seed → grown = 4 steps
-    return GardenProgress(
-      completedSessions: harvestedPlants * stagesPerPlant + plantStageIndex,
-      harvestedPlants: harvestedPlants,
-    );
+    return harvestedPlants * stagesPerPlant + plantStageIndex;
   }
 
   // ---- Tuning knobs — change these to make leveling faster/slower ----

@@ -1,10 +1,23 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Thin wrapper around Firebase Authentication so screens don't talk
 /// to FirebaseAuth directly.
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// google_sign_in v7 must be initialized EXACTLY once per app run, and
+  /// before any other call — calling it again (or signOut before it) is
+  /// "undefined behaviour". So it's shared, and retried only if it failed.
+  static Future<void>? _googleReady;
+
+  static Future<void> _ensureGoogle() {
+    return _googleReady ??= GoogleSignIn.instance.initialize().catchError((Object error) {
+      _googleReady = null; // let the next attempt try again
+      throw error;
+    });
+  }
 
   User? get currentUser => _auth.currentUser;
 
@@ -39,8 +52,8 @@ class AuthService {
 
   /// Uses native Android Google Sign-In sheet instead of browser redirects.
   Future<User> signInWithGoogle() async {
-    // 1. Initialize Google Sign-In instance (required in v7+)
-    await GoogleSignIn.instance.initialize();
+    // 1. Initialize Google Sign-In (once per app run — see _ensureGoogle)
+    await _ensureGoogle();
 
     // 2. Prompt native Android account picker / Credential Manager sheet
     final GoogleSignInAccount googleUser =
@@ -63,14 +76,28 @@ class AuthService {
     return cred.user!;
   }
 
+  /// Signs out of Firebase — and of Google too, but only if this account
+  /// used Google, and never letting a Google hiccup stop the real sign-out.
   Future<void> signOut() async {
-    await GoogleSignIn.instance.signOut();
+    final usedGoogle = _auth.currentUser?.providerData.any((p) => p.providerId == 'google.com') ?? false;
+    if (usedGoogle) {
+      try {
+        await _ensureGoogle();
+        await GoogleSignIn.instance.signOut();
+      } catch (error) {
+        debugPrint('Google sign-out failed (continuing): $error');
+      }
+    }
     await _auth.signOut();
   }
 
   /// Turns Firebase's technical error codes into something a student
   /// can actually act on.
   static String friendlyError(Object error) {
+    if (error is GoogleSignInException) {
+      if (error.code == GoogleSignInExceptionCode.canceled) return 'Sign-in was cancelled.';
+      return "Google sign-in didn't work. Please try again.";
+    }
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-email':

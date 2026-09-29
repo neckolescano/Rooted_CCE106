@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/garden_scenes.dart';
 import '../theme/app_theme.dart';
+import 'garden_scene_backdrop.dart';
 import 'pixel_panel.dart';
 
 /// A little framed window into the game world: your meadow art inside a
@@ -16,7 +18,12 @@ class SceneFrame extends StatelessWidget {
     this.imageAlignment = Alignment.center,
     this.tint,
     this.golden = false,
+    this.scene,
   });
+
+  /// Show the meadow in this Garden Scene (colour wash + moving effects)
+  /// instead of [asset] + [tint] — the Garden Archive uses the equipped one.
+  final GardenScene? scene;
 
   final List<Widget> children;
   final String asset;
@@ -43,7 +50,15 @@ class SceneFrame extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) => const ColoredBox(color: Color(0xFFAFD8C9)),
     );
     final wash = tint;
-    if (wash != null) {
+    final scene = this.scene;
+    if (scene != null) {
+      picture = GardenSceneBackdrop(
+        scene: scene,
+        alignment: imageAlignment,
+        pixel: 1.5,
+        filterQuality: FilterQuality.medium,
+      );
+    } else if (wash != null) {
       // "modulate" multiplies the colours: keeps all the pixel detail,
       // just shifts the mood (e.g. blue = night).
       picture = ColorFiltered(colorFilter: ColorFilter.mode(wash, BlendMode.modulate), child: picture);

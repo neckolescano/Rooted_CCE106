@@ -13,8 +13,14 @@ class NotesModel extends ChangeNotifier {
   bool isGenerating = false;
   String? errorMessage;
 
-  void loadFrom(String savedText) {
+  /// Called with each newly generated study material so it gets saved —
+  /// even if the Notes screen was closed while the AI was working (e.g.
+  /// the timer ended). Set once at start-up (see main.dart).
+  void Function(StudyMaterial material)? onGenerated;
+
+  void loadFrom(String savedText, {StudyMaterial? savedMaterial}) {
     text = savedText;
+    material = savedMaterial;
     notifyListeners();
   }
 
@@ -31,10 +37,12 @@ class NotesModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      material = await service.generateStudyMaterial(text, options);
+      final generated = await service.generateStudyMaterial(text, options);
+      material = generated;
+      onGenerated?.call(generated);
     } catch (error) {
+      // Keep the previously saved material — a failed try shouldn't lose it.
       errorMessage = error.toString();
-      material = null;
     } finally {
       isGenerating = false;
       notifyListeners();

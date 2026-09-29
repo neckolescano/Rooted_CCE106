@@ -83,12 +83,10 @@ When one of these is answered, move it to
   slow, so the owner should judge using the "kuwaGO (profile — smooth
   animations)" launch configuration.
 
-### Q12. Delete the unused leftover files?
-- `lib/widgets/sparkle_overlay.dart`, `lib/widgets/plant_widget.dart`,
-  `lib/widgets/timer_controls.dart`, `lib/models/plant_state.dart`,
-  `lib/services/pomodoro_timer.dart`. (`background_scene.dart` is still used
-  by the login and timer screens; it is not a leftover.)
-- **Rule:** ask the owner before deleting anything.
+### ~~Q12. Delete the unused leftover files?~~ — answered 2026-09-29
+- **Yes (owner).** `sparkle_overlay`, `plant_widget`, `timer_controls`,
+  `plant_state` and `pomodoro_timer` were deleted (still in git history).
+- **Rule still stands:** ask the owner before deleting anything.
 
 ### Q13. Play Integrity / App Check on the school project
 - Registering Play Integrity on **rooted-f95c7** gave "an error occurred

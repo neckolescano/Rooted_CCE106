@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,19 +6,28 @@ import '../models/notes_model.dart';
 import '../models/plant_model.dart';
 import '../models/session_model.dart';
 import '../services/auth_service.dart';
+import '../services/intro_cue.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/background_scene.dart';
 import '../widgets/email_auth_dialog.dart';
+import '../widgets/login_scene.dart';
+import '../widgets/owl_mascot.dart';
 import '../widgets/pixel_button.dart';
 import '../widgets/pixel_panel.dart';
-import '../services/intro_cue.dart';
-import '../widgets/kuwago_lockup.dart';
 import 'main_shell.dart';
 
-/// The kuwaGO login screen. All three options
-/// now use real Firebase accounts: Google, email (create or sign in),
-/// or an anonymous guest account.
+/// The kuwaGO login screen: a morning garden under a wooden pergola.
+///
+/// Its entrance is a little story: kuwago knocks the hook on the beam, the
+/// kuwaGO sign drops down on its chains and swings, kuwago lands on top
+/// ("Hoo! Welcome!"), then the buttons rise in. On app start the opening
+/// (widgets/clock_intro.dart) flies kuwago from the splash straight to the
+/// hook, so it all flows on from the splash; any other time (e.g. after
+/// signing out) kuwago flies in by itself first. Tap kuwago to make it hop
+/// and swing the sign.
+///
+/// All three sign-in options use real Firebase accounts: Google, email
+/// (create or sign in), or an anonymous guest account.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -25,53 +35,71 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+// ---- Entrance timing (ms, after kuwago reaches the hook) ----
+const double _flyInMs = 650; // only when there was no opening to bring kuwago
+const _knock = (0.0, 170.0);
+const _drop = (170.0, 630.0);
+const _owlToSign = (250.0, 850.0);
+const _words = (700.0, 1050.0);
+const _welcome = (900.0, 2500.0);
+const double _storyMs = 2600;
+
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   // `late` = only created on the first button tap, not when the screen opens.
   late final _auth = AuthService();
   bool _busy = false;
 
-  // Entrance: the sign unfurls under the kuwaGO lockup, then the buttons
-  // rise in one by one. On app start it waits for the opening to reveal
-  // this page (the opening flies the lockup onto the sign).
-  late final AnimationController _entrance =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+  /// Does kuwago still have to fly in (no opening brought it)?
+  late final bool _flyIn = IntroCue.stage.value == IntroStage.done;
+  late final double _lead = _flyIn ? _flyInMs : 0;
+
+  late final AnimationController _story =
+      AnimationController(vsync: this, duration: Duration(milliseconds: (_lead + _storyMs).round()));
+  // Ambient clock: clouds, sun rays, ivy, butterflies, leaves, blinking.
+  late final AnimationController _ambient =
+      AnimationController(vsync: this, duration: const Duration(seconds: 120))..repeat();
+  // kuwago's hop (and the sign's extra swing) when tapped.
+  late final AnimationController _tap = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
+
+  final _leaves = LeafDrift.scatter(Random(12), 9);
 
   @override
   void initState() {
     super.initState();
-    if (IntroCue.stage.value == IntroStage.covering) {
-      IntroCue.stage.addListener(_startWhenRevealed);
+    if (_flyIn) {
+      _story.forward();
     } else {
-      _entrance.forward();
+      // The opening is flying kuwago to the hook; start when it arrives.
+      IntroCue.stage.addListener(_startWhenDelivered);
+      // Safety net: if the opening never reports back (it normally takes
+      // ~1.5 s), start anyway so the buttons can never stay hidden.
+      Future<void>.delayed(const Duration(seconds: 6), () {
+        if (mounted && !_story.isAnimating && _story.value == 0) {
+          debugPrint('[Login] opening never handed over — starting the entrance anyway');
+          IntroCue.stage.removeListener(_startWhenDelivered);
+          _story.forward();
+        }
+      });
     }
   }
 
-  void _startWhenRevealed() {
-    if (IntroCue.stage.value == IntroStage.covering) return;
-    IntroCue.stage.removeListener(_startWhenRevealed);
-    if (mounted) _entrance.forward();
+  void _startWhenDelivered() {
+    if (IntroCue.stage.value != IntroStage.done) return;
+    IntroCue.stage.removeListener(_startWhenDelivered);
+    if (mounted && !_story.isAnimating && _story.value == 0) _story.forward();
   }
 
   @override
   void dispose() {
-    IntroCue.stage.removeListener(_startWhenRevealed);
-    _entrance.dispose();
+    IntroCue.stage.removeListener(_startWhenDelivered);
+    _story.dispose();
+    _ambient.dispose();
+    _tap.dispose();
     super.dispose();
   }
 
-  /// Slides [child] up into place between [from] and [to] of the entrance.
-  Widget _rise(double from, double to, Widget child) {
-    return AnimatedBuilder(
-      animation: _entrance,
-      child: child,
-      builder: (context, child) {
-        final t = Curves.easeOutBack.transform(((_entrance.value - from) / (to - from)).clamp(0.0, 1.0));
-        return Opacity(
-          opacity: t.clamp(0.0, 1.0),
-          child: Transform.translate(offset: Offset(0, 36 * (1 - t)), child: child),
-        );
-      },
-    );
+  void _tapOwl() {
+    if (_story.value * _story.duration!.inMilliseconds >= _lead + _owlToSign.$2) _tap.forward(from: 0);
   }
 
   /// Runs a sign-in, then loads that user's saved data and enters the app.
@@ -102,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         wilted: storage.savedPlantWilted,
         speciesId: storage.savedPlantSpecies,
       );
-      notes.loadFrom(storage.savedNotes);
+      notes.loadFrom(storage.savedNotes, savedMaterial: storage.savedStudyMaterial);
       session.reset();
 
       if (!mounted) return;
@@ -140,66 +168,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
   }
 
+  static double _seg(double v, (double, double) s, [Curve c = Curves.linear]) =>
+      c.transform(((v - s.$1) / (s.$2 - s.$1)).clamp(0.0, 1.0));
+
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
     return Scaffold(
       body: Stack(
         children: [
-          // Your meadow art fills the screen instead of plain cream.
-          BackgroundScene(
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                child: Column(
-                  children: [
-                    const Spacer(flex: 2),
-                    _TitleSign(entrance: _entrance),
-                    const Spacer(flex: 3),
-                    _rise(0.40, 0.75, PixelButton(
-                      label: 'Continue with Google',
-                      icon: Icons.g_mobiledata,
-                      onPressed: () => _run(_auth.signInWithGoogle),
-                    )),
-                    const SizedBox(height: AppSpacing.md),
-                    _rise(0.50, 0.85, PixelButton(
-                      label: 'Create Cozy Account',
-                      onPressed: _emailFlow,
-                    )),
-                    const SizedBox(height: AppSpacing.md),
-                    // On a dark plank so it stays readable over the grass.
-                    _rise(0.60, 0.95, Semantics(
-                      button: true,
-                      label: 'Play as guest trainee',
-                      excludeSemantics: true,
-                      child: GestureDetector(
-                        onTap: () => _run(_auth.signInAsGuest),
-                        child: PixelPanel(
-                          style: PanelStyle.dark,
-                          backgroundColor: const Color(0xE63E2A1B),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'OR   ',
-                                  style: AppText.small(color: AppColors.textCream.withValues(alpha: 0.7)),
-                                ),
-                                TextSpan(
-                                  text: 'PLAY AS GUEST TRAINEE',
-                                  style: AppText.small(color: AppColors.accentGold, weight: FontWeight.w800)
-                                      .copyWith(decoration: TextDecoration.underline, decorationColor: AppColors.accentGold),
-                                ),
-                              ],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                    )),
-                    const SizedBox(height: AppSpacing.xl),
-                  ],
-                ),
-              ),
+          AnimatedBuilder(
+            animation: Listenable.merge([_story, _ambient, _tap]),
+            builder: (context, _) => LayoutBuilder(
+              builder: (context, box) => _scene(LoginLayout(box.biggest, padding), padding),
             ),
           ),
           if (_busy)
@@ -215,84 +196,271 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ),
     );
   }
-}
 
-/// The parchment sign in the sky: the kuwaGO lockup (kuwago perched on the
-/// clock O — the same picture as the launch splash), the tagline and a
-/// line about the app. The sign itself unfurls downward from under the
-/// lockup; the lockup never moves, so the opening can land on it exactly.
-class _TitleSign extends StatelessWidget {
-  const _TitleSign({required this.entrance});
+  Widget _scene(LoginLayout l, EdgeInsets padding) {
+    final started = _story.value > 0 || _story.isAnimating;
+    final ms = _story.value * (_lead + _storyMs) - _lead; // 0 = kuwago at the hook
+    final sec = _ambient.value * 120;
+    final hook = l.hook;
+    final chainLen = l.chainLen;
+    const signW = LoginLayout.signW, signH = LoginLayout.signH, owlSize = LoginLayout.owlSize;
 
-  final Animation<double> entrance;
+    // ---- Knock: the beam shudders, leaves shake loose, the screen thumps ----
+    final knockT = _seg(ms, _knock);
+    final beamShake = knockT > 0 && knockT < 1 ? sin(knockT * pi * 6) * 2 * (1 - knockT) : 0.0;
+    final sinceLand = ms - _drop.$2;
+    final thump = sinceLand > -120 && sinceLand < 180 ? sin(sinceLand / 18) * 2.5 * (1 - (sinceLand + 120) / 300) : 0.0;
 
-  static double _seg(double v, double a, double b, [Curve curve = Curves.linear]) =>
-      curve.transform(((v - a) / (b - a)).clamp(0.0, 1.0));
+    // ---- The sign drops on its chains, then swings (damped pendulum) ----
+    final dropY = started
+        ? -(hook.dy + chainLen + signH + 40) * (1 - Curves.bounceOut.transform(_seg(ms, _drop)))
+        : -(hook.dy + chainLen + signH + 40);
+    double swing = 0;
+    if (ms > _drop.$2) {
+      final t = (ms - _drop.$2) / 1000;
+      swing += 0.2 * exp(-t / 0.9) * sin(2 * pi * t / 1.15);
+    }
+    if (_tap.isAnimating) {
+      final t = _tap.value * 2.6;
+      swing += 0.17 * exp(-t / 0.8) * sin(2 * pi * t / 1.15);
+    }
+    swing += 0.012 * sin(2 * pi * sec / 4.2); // a gentle breeze
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: entrance,
-      builder: (context, _) {
-        final e = entrance.value;
-        final unfurl = _seg(e, 0, 0.38, Curves.easeOutBack);
-        final words = _seg(e, 0.22, 0.55);
-        return Stack(
-          children: [
-            // The board, unrolling from the top.
-            Positioned.fill(
-              child: Opacity(
-                opacity: _seg(e, 0, 0.12),
-                child: Transform.scale(
-                  scaleY: unfurl.clamp(0.0, 1.2),
-                  alignment: Alignment.topCenter,
-                  child: const PixelPanel(style: PanelStyle.parchment, child: SizedBox.expand()),
-                ),
+    Offset signPoint(Offset local) {
+      final p = Offset(local.dx, local.dy + dropY);
+      return hook + Offset(p.dx * cos(swing) - p.dy * sin(swing), p.dx * sin(swing) + p.dy * cos(swing));
+    }
+
+    // ---- kuwago ----
+    Offset? owlCenter; // null = sitting on the sign (drawn with it)
+    bool flying = false;
+    int look = 0;
+    if (!started) {
+      owlCenter = null; // not here yet (the opening is bringing it)
+    } else if (ms < 0) {
+      // Flying in from the top right.
+      final t = Curves.easeOutCubic.transform(((ms + _lead) / _lead).clamp(0.0, 1.0));
+      owlCenter = Offset.lerp(Offset(l.width + 40, hook.dy - 30), l.hookPerch, t)! + Offset(0, -30 * sin(pi * t));
+      flying = true;
+      look = -1;
+    } else if (ms < _owlToSign.$1) {
+      owlCenter = l.hookPerch + Offset(10 * sin(pi * knockT * 2).abs(), 0); // knock knock!
+      flying = true;
+      look = 1;
+    } else if (ms < _owlToSign.$2) {
+      final t = _seg(ms, _owlToSign, Curves.easeInOutCubic);
+      final target = signPoint(l.perch) - const Offset(0, owlSize / 2 - 6);
+      owlCenter = Offset.lerp(l.hookPerch, target, t)! + Offset(0, -30 * sin(pi * t));
+      flying = true;
+    }
+    final onSign = started && ms >= _owlToSign.$2;
+    final wingsUp = flying && (ms ~/ 90).isEven;
+    final blink = (sec * 1000 % 3100) < 130;
+    final hop = _tap.isAnimating ? sin(pi * min(1.0, _tap.value * 2.6 / 0.45)) * 12 : 0.0;
+    final hopWings = _tap.isAnimating && _tap.value * 2.6 < 0.45 && (_tap.value * 26).floor().isEven;
+    final landS = _seg(ms, (_owlToSign.$2, _owlToSign.$2 + 260));
+    final squash = landS > 0 && landS < 1 ? 1 - 0.16 * sin(pi * landS) : 1.0;
+    final saysWelcome = ms > _welcome.$1 && ms < _welcome.$2;
+    final saysHoo = _tap.isAnimating && _tap.value * 2.6 < 0.9;
+
+    Widget owl({required bool wings}) => OwlSprite(
+          size: owlSize,
+          perch: false,
+          look: onSign ? -1 : look,
+          blink: blink && !flying,
+          wingsUp: wings,
+        );
+
+    final shake = Offset(beamShake + thump * 0.4, thump);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Transform.translate(
+          offset: shake,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: LoginSkyPainter()))),
+              Positioned.fill(child: CustomPaint(painter: LoginSunCloudsPainter(sec: sec))),
+              Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: LoginLandPainter()))),
+              Positioned.fill(
+                child: CustomPaint(painter: LoginPergolaPainter(beamTop: l.beamTop, sec: sec, shake: beamShake)),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 20),
-              child: Column(
-                children: [
-                  // Hidden until the opening has flown its copy in here.
-                  ValueListenableBuilder<IntroStage>(
-                    valueListenable: IntroCue.stage,
-                    builder: (context, stage, child) =>
-                        Opacity(opacity: stage == IntroStage.done ? 1 : 0, child: child),
-                    // A third bigger than on the splash (2 dp per pixel);
-                    // the opening grows it to this size as it lands.
-                    child: KeyedSubtree(
-                      key: IntroCue.loginLockupKey,
-                      child: SizedBox.fromSize(
-                        size: KuwagoLockup.size * (4 / 3),
-                        child: const FittedBox(child: LiveKuwagoLockup()),
+
+              // Where the opening delivers kuwago (it hovers here to knock).
+              Positioned.fromRect(
+                rect: Rect.fromCenter(center: l.hookPerch, width: owlSize, height: owlSize),
+                child: KeyedSubtree(key: IntroCue.loginOwlKey, child: const SizedBox.expand()),
+              ),
+
+              // Chains + sign + kuwago, swinging around the hook.
+              if (started)
+                Positioned(
+                  left: hook.dx - signW / 2,
+                  top: hook.dy,
+                  width: signW,
+                  height: chainLen + signH + dropY.abs() + 80,
+                  child: Transform.rotate(
+                    angle: swing,
+                    alignment: Alignment.topCenter,
+                    child: Transform.translate(
+                      offset: Offset(0, dropY),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            width: signW,
+                            height: chainLen + 8,
+                            child: CustomPaint(painter: SignChainsPainter(chainLen: chainLen, spread: signW / 2 - 18)),
+                          ),
+                          Positioned(left: 0, top: chainLen, width: signW, height: signH, child: const HangingSign()),
+                          if (onSign)
+                            Positioned(
+                              left: signW / 2 + l.perch.dx - owlSize / 2,
+                              top: chainLen - owlSize * 21 / 24 + 2 - hop,
+                              child: Semantics(
+                                button: true,
+                                label: 'kuwago the owl',
+                                child: GestureDetector(
+                                  onTap: _tapOwl,
+                                  child: Transform.scale(
+                                    scaleY: squash,
+                                    scaleX: 2 - squash,
+                                    alignment: Alignment.bottomCenter,
+                                    child: owl(wings: hopWings),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (onSign && (saysWelcome || saysHoo))
+                            Positioned(
+                              left: signW / 2 + l.perch.dx + 12,
+                              top: chainLen - owlSize - 20 - hop,
+                              child: OwlBubble(saysHoo ? 'Hoo!' : 'Hoo! Welcome!'),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Opacity(
-                    opacity: words,
-                    child: Column(
-                      children: [
-                        Text(
-                          '★ ${AppInfo.tagline.toUpperCase()} ★',
-                          style: AppTheme.body(size: 14, color: AppColors.greenDeep, weight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Grow your virtual forest with every focus block.',
-                          textAlign: TextAlign.center,
-                          style: AppTheme.body(size: 13, weight: FontWeight.w600),
-                        ),
-                      ],
+                ),
+              if (knockT > 0 && knockT < 1)
+                Positioned.fill(child: CustomPaint(painter: KnockSparkPainter(center: hook + const Offset(0, 4), t: knockT))),
+              Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: LoginBushesPainter()))),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: LoginLifePainter(
+                      sec: sec,
+                      leaves: _leaves,
+                      burstT: started && ms > _knock.$1 ? (ms - _knock.$1) / 1000 : -1,
+                      burstFrom: Offset(l.width / 2, l.beamTop + LoginLayout.beamH),
+                      meadowTop: l.meadowTop,
                     ),
                   ),
-                ],
+                ),
               ),
+              // kuwago in flight (before it sits on the sign).
+              if (owlCenter != null)
+                Positioned(
+                  left: owlCenter.dx - owlSize / 2,
+                  top: owlCenter.dy - owlSize / 2,
+                  child: IgnorePointer(child: owl(wings: wingsUp)),
+                ),
+            ],
+          ),
+        ),
+
+        // The line under the sign.
+        Positioned(
+          left: AppSpacing.xl,
+          right: AppSpacing.xl,
+          top: hook.dy + chainLen + signH + 18,
+          child: Opacity(
+            opacity: started ? _seg(ms, _words) : 0,
+            child: Text(
+              'Grow your virtual forest\nwith every focus block.',
+              textAlign: TextAlign.center,
+              style: AppTheme.body(size: 14, color: AppColors.textDark, weight: FontWeight.w800),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+
+        // The buttons, rising onto the meadow one by one.
+        Positioned(
+          left: 28,
+          right: 28,
+          bottom: padding.bottom + 22,
+          child: Column(
+            children: [
+              _rise(started, ms, 750, const RibbonTag('★ JOIN THE GARDEN ★')),
+              const SizedBox(height: AppSpacing.md),
+              _rise(
+                started,
+                ms,
+                830,
+                PixelButton(
+                  label: 'Continue with Google',
+                  icon: Icons.g_mobiledata,
+                  onPressed: () => _run(_auth.signInWithGoogle),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _rise(started, ms, 930, PixelButton(label: 'Create Cozy Account', onPressed: _emailFlow)),
+              const SizedBox(height: AppSpacing.md),
+              _rise(
+                started,
+                ms,
+                1030,
+                // On a dark plank so it stays readable over the grass.
+                Semantics(
+                  button: true,
+                  label: 'Play as guest trainee',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    onTap: () => _run(_auth.signInAsGuest),
+                    child: PixelPanel(
+                      style: PanelStyle.dark,
+                      backgroundColor: const Color(0xE63E2A1B),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'OR   ',
+                              style: AppText.small(color: AppColors.textCream.withValues(alpha: 0.7)),
+                            ),
+                            TextSpan(
+                              text: 'PLAY AS GUEST TRAINEE',
+                              style: AppText.small(color: AppColors.accentGold, weight: FontWeight.w800)
+                                  .copyWith(decoration: TextDecoration.underline, decorationColor: AppColors.accentGold),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Rises [child] into place 350 ms after [start] (ms of the entrance).
+  Widget _rise(bool started, double ms, double start, Widget child) {
+    final t = started ? Curves.easeOutBack.transform(((ms - start) / 350).clamp(0.0, 1.0)) : 0.0;
+    return IgnorePointer(
+      ignoring: t < 0.5,
+      child: Opacity(
+        opacity: t.clamp(0.0, 1.0),
+        child: Transform.translate(offset: Offset(0, 40 * (1 - t)), child: child),
+      ),
     );
   }
 }

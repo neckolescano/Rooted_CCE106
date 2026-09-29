@@ -6,6 +6,7 @@ import '../models/notes_model.dart';
 import '../models/plant_model.dart';
 import '../models/session_model.dart';
 import '../services/auth_service.dart';
+import '../services/reminder_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../models/card_designs.dart';
@@ -18,6 +19,7 @@ import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_section_header.dart';
 import '../widgets/profile_avatar.dart';
 import 'login_screen.dart';
+import 'study_log_screen.dart';
 
 /// The player's profile, laid out like a game character sheet: a meadow
 /// cover with the avatar framed on top, stat tiles, earnable badges, and
@@ -30,8 +32,43 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // UI only for now — reminders aren't sent yet (see the backlog).
-  bool _pushRemindersOn = true;
+  /// Push Reminders switch: asks for notification permission when turned
+  /// on, then schedules the daily reminder (ReminderService).
+  Future<void> _setReminders(bool on) async {
+    final storage = context.read<StorageService>();
+    final plantName = context.read<PlantModel>().species.name;
+    final messenger = ScaffoldMessenger.of(context);
+    if (on && !await ReminderService.requestPermission()) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('kuwago needs permission to send notifications. You can allow it in your phone\'s Settings → Apps → kuwaGO.'),
+      ));
+      return;
+    }
+    await storage.setReminders(on: on);
+    await ReminderService.apply(storage, plantName: plantName);
+    if (on) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Hoo! Daily reminder set for ${_formatTime(storage.reminderMinutes)} 🦉'),
+      ));
+    }
+  }
+
+  Future<void> _pickReminderTime() async {
+    final storage = context.read<StorageService>();
+    final plantName = context.read<PlantModel>().species.name;
+    final current = storage.reminderMinutes;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current ~/ 60, minute: current % 60),
+      helpText: 'REMIND ME TO STUDY AT',
+    );
+    if (picked == null || !mounted) return;
+    await storage.setReminders(minutes: picked.hour * 60 + picked.minute);
+    await ReminderService.apply(storage, plantName: plantName);
+  }
+
+  String _formatTime(int minutes) =>
+      MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60));
 
   Future<void> _signOut() async {
     final storage = context.read<StorageService>();
@@ -54,8 +91,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final notes = context.read<NotesModel>();
     final session = context.read<SessionModel>();
 
-    await storage.detachUser(); // saves anything pending, then clears this device
-    await AuthService().signOut();
+    // Order matters: 1) upload pending changes while still signed in,
+    // 2) actually sign out, 3) only THEN wipe this phone. If sign-out
+    // fails, nothing is wiped and the student can simply try again.
+    await storage.syncNow();
+    try {
+      await AuthService().signOut();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't sign out. Please try again.")),
+      );
+      return;
+    }
+    await ReminderService.cancel(); // the next person shouldn't get this reminder
+    await storage.detachUser(push: false); // already uploaded above
 
     plant.loadFrom(stageIndex: 0, wilted: false);
     notes.reset();
@@ -71,38 +121,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Scroll with a text box to rename the gardener (2–20 characters).
   Future<void> _editName() async {
     final storage = context.read<StorageService>();
-    final controller = TextEditingController(text: storage.username);
     final newName = await showDialog<String>(
       context: context,
       barrierColor: AppColors.overlay,
-      builder: (dialogContext) => PixelDialog(
-        title: 'Your gardener name',
-        sealIcon: Icons.edit,
-        body: TextField(
-          controller: controller,
-          maxLength: 20,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          style: AppTheme.body(size: 15, weight: FontWeight.w800),
-          decoration: const InputDecoration(filled: true, fillColor: Color(0xFFFBEBD3)),
-        ),
-        actions: [
-          PixelButton(
-            label: 'Save',
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.length >= 2) Navigator.of(dialogContext).pop(name);
-            },
-          ),
-          PixelButton(
-            label: 'Cancel',
-            tone: ButtonTone.secondary,
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-        ],
-      ),
+      builder: (_) => _NameDialog(initial: storage.username),
     );
-    controller.dispose();
     if (newName != null && mounted) await storage.setUsername(newName);
   }
 
@@ -151,10 +174,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final storage = context.watch<StorageService>();
-    final plant = context.watch<PlantModel>();
-    final progress = GardenProgress.from(
+    final progress = GardenProgress(
+      completedSessions: storage.completedSessions,
       harvestedPlants: storage.harvestedPlants,
-      plantStageIndex: plant.stage.index,
     );
     final badges = badgesFor(
       completedSessions: progress.completedSessions,
@@ -245,6 +267,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(child: _StatTile(icon: Icons.emoji_events, value: '$earned', label: 'Badges')),
           ],
         ),
+        const SizedBox(height: AppSpacing.md),
+        // Every recent session, day by day.
+        PixelButton(
+          label: 'Study Log',
+          icon: Icons.history,
+          tone: ButtonTone.secondary,
+          height: 44,
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StudyLogScreen())),
+        ),
         const SizedBox(height: AppSpacing.xl),
         PixelSectionHeader(
           'Badges',
@@ -292,12 +323,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.notifications,
                 title: 'Push Reminders',
                 trailing: Switch(
-                  value: _pushRemindersOn,
+                  value: storage.remindersOn,
                   activeThumbColor: AppColors.accentGreen,
                   activeTrackColor: AppColors.greenDeep,
-                  onChanged: (value) => setState(() => _pushRemindersOn = value),
+                  onChanged: _setReminders,
                 ),
               ),
+              // When reminders are on: when to be reminded (tap to change).
+              if (storage.remindersOn) ...[
+                const _RowDivider(),
+                _SettingRow(
+                  icon: Icons.schedule,
+                  title: 'Reminder time',
+                  trailing: Text(
+                    _formatTime(storage.reminderMinutes),
+                    style: AppText.small(color: AppColors.greenDeep, weight: FontWeight.w900),
+                  ),
+                  onTap: _pickReminderTime,
+                ),
+              ],
               const _RowDivider(),
               _SettingRow(
                 icon: Icons.edit,
@@ -596,4 +640,56 @@ class _DashPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DashPainter old) => false;
+}
+
+/// Scroll with a text box to rename the gardener (2–20 characters).
+/// It owns its text controller, so the controller lives exactly as long
+/// as the dialog — including its closing animation.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PixelDialog(
+      title: 'Your gardener name',
+      sealIcon: Icons.edit,
+      body: TextField(
+        controller: _controller,
+        maxLength: 20,
+        autofocus: true,
+        textCapitalization: TextCapitalization.words,
+        style: AppTheme.body(size: 15, weight: FontWeight.w800),
+        decoration: const InputDecoration(filled: true, fillColor: Color(0xFFFBEBD3)),
+      ),
+      actions: [
+        PixelButton(
+          label: 'Save',
+          onPressed: () {
+            final name = _controller.text.trim();
+            if (name.length >= 2) Navigator.of(context).pop(name);
+          },
+        ),
+        PixelButton(
+          label: 'Cancel',
+          tone: ButtonTone.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
 }

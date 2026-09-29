@@ -181,9 +181,9 @@ Details on AI: [10-ai-and-firebase.md](10-ai-and-firebase.md).
 - `owl_mascot` (`OwlSprite`, `OwlMascot`), drawn from `art/owl_art.dart`
 - `kuwago_logo` (`KuwagoLogo`, `PixelClock`)
 
-**Unused leftovers** (ask the owner before deleting): `sparkle_overlay`,
-`plant_widget`, `timer_controls`, `models/plant_state`,
-`services/pomodoro_timer`.
+(The old unused `sparkle_overlay`, `plant_widget`, `timer_controls`,
+`models/plant_state` and `services/pomodoro_timer` were deleted on
+2026-09-29.)
 
 ## 7. Code-generated art (`tool/`)
 

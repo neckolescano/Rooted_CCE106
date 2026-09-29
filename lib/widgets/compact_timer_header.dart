@@ -10,6 +10,10 @@ import 'pixel_panel.dart';
 /// the same app-wide SessionModel the Timer screen uses, so the real
 /// countdown keeps running underneath no matter which screen is on top,
 /// and pausing here pauses the actual session.
+///
+/// When no session is running (e.g. the journal was opened from Home) it
+/// takes no space at all. It includes its own gap below, for the same
+/// reason.
 class CompactTimerHeader extends StatelessWidget {
   const CompactTimerHeader({super.key});
 
@@ -18,7 +22,15 @@ class CompactTimerHeader extends StatelessWidget {
     final session = context.watch<SessionModel>();
     final isPaused = session.status == SessionStatus.paused;
     final isActive = isPaused || session.status == SessionStatus.running;
+    if (!isActive) return const SizedBox.shrink();
 
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: _bar(context, session, isPaused, isActive),
+    );
+  }
+
+  Widget _bar(BuildContext context, SessionModel session, bool isPaused, bool isActive) {
     return PixelPanel(
       style: PanelStyle.dark,
       padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),

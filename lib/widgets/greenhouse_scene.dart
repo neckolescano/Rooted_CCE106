@@ -1,6 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/garden_scenes.dart';
 import '../models/plant_model.dart';
+import '../services/storage_service.dart';
+import 'garden_scene_backdrop.dart';
 import '../theme/app_theme.dart';
 import '../services/intro_cue.dart';
 import 'owl_mascot.dart';
@@ -31,8 +35,6 @@ class GreenhouseScene extends StatelessWidget {
   /// Put on the window so the Home screen can find where it is on screen
   /// (the Start Study Session zoom flies into it).
   final GlobalKey? windowKey;
-
-  static const _meadowAsset = 'assets/images/backgrounds/garden_meadow.png';
 
   // Sizes the scene can show the 128px plant at. 256 = exactly 2×
   // (the art-scale rule). Smaller phones fall back to the next size.
@@ -108,15 +110,15 @@ class GreenhouseScene extends StatelessWidget {
                         key: windowKey,
                         fit: StackFit.expand,
                         children: [
-                          Image.asset(
-                            _meadowAsset,
-                            fit: BoxFit.cover,
+                          // The world outside = the equipped Garden Scene —
+                          // the same one the Timer shows after the zoom.
+                          GardenSceneBackdrop(
+                            scene: gardenSceneById(context.select<StorageService, String>((s) => s.gardenScene)),
                             // Aimed at the horizon + tree. Shown smaller than
                             // the source, so light smoothing looks cleaner.
                             alignment: const Alignment(0.2, 0.1),
+                            pixel: 1.5,
                             filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const ColoredBox(color: Color(0xFFAFD8C9)),
                           ),
                           CustomPaint(painter: _CasingPainter()),
                           _Sash(isLeft: true, angle: swing * _maxSwing),

@@ -26,6 +26,15 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
   static const _shadowedCream = [Shadow(offset: Offset(0, 2), color: Color(0x99000000))];
 
   @override
+  void initState() {
+    super.initState();
+    // Open on the tab that has something in it — e.g. "Flashcards only"
+    // used to open on an empty Questions tab, which looked like a failure.
+    final material = context.read<NotesModel>().material;
+    _showFlashcards = material != null && material.questions.isEmpty && material.flashcards.isNotEmpty;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final material = context.watch<NotesModel>().material;
 
@@ -56,7 +65,6 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const CompactTimerHeader(),
-                const SizedBox(height: AppSpacing.md),
                 if (material?.offline ?? false) ...[
                   // Made by OfflineStudyMaker because the AI was busy/slow.
                   PixelPanel(

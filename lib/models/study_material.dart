@@ -11,6 +11,8 @@ class Flashcard {
       back: json['back']?.toString() ?? '',
     );
   }
+
+  Map<String, Object> toJson() => {'front': front, 'back': back};
 }
 
 /// One study question. `type` is "multiple_choice", "true_false"
@@ -51,6 +53,14 @@ class StudyQuestion {
       explanation: json['explanation']?.toString(),
     );
   }
+
+  Map<String, Object> toJson() => {
+        'question': question,
+        'type': type,
+        'answer': answer,
+        if (choices != null) 'choices': choices!,
+        if (explanation != null) 'explanation': explanation!,
+      };
 }
 
 /// The AI sometimes answers a multiple choice question with "B" or with
@@ -106,6 +116,13 @@ class StudyMaterial {
             .toList()
         : <Flashcard>[];
 
-    return StudyMaterial(questions: questions, flashcards: flashcards);
+    return StudyMaterial(questions: questions, flashcards: flashcards, offline: json['offline'] == true);
   }
+
+  /// For saving (phone + Firestore) — read back with [StudyMaterial.fromJson].
+  Map<String, Object> toJson() => {
+        'questions': [for (final q in questions) q.toJson()],
+        'flashcards': [for (final f in flashcards) f.toJson()],
+        'offline': offline,
+      };
 }

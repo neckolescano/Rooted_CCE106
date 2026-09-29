@@ -64,11 +64,15 @@ class _NotesScreenState extends State<NotesScreen> {
     await notes.generateStudyMaterial(AiService(), options);
     if (!mounted) return;
 
-    if (notes.material != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const StudyMaterialScreen()),
-      );
-    }
+    // Open it only if THIS try worked (older saved material may still be
+    // there after a failed try).
+    if (notes.errorMessage == null && notes.material != null) _openMaterial();
+  }
+
+  void _openMaterial() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const StudyMaterialScreen()),
+    );
     // If it failed, errorMessage is now set on the model and the error
     // panel below just shows it — no navigation needed for that case.
   }
@@ -93,7 +97,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   children: [
                     PixelIconButton(
                       icon: Icons.arrow_back,
-                      semanticLabel: 'Back to the timer',
+                      semanticLabel: 'Back',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -109,7 +113,6 @@ class _NotesScreenState extends State<NotesScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const CompactTimerHeader(),
-                const SizedBox(height: AppSpacing.md),
                 Expanded(
                   child: _JournalPage(
                     controller: _controller,
@@ -128,6 +131,17 @@ class _NotesScreenState extends State<NotesScreen> {
                   icon: Icons.auto_awesome,
                   onPressed: notes.isGenerating ? null : _generate,
                 ),
+                // The last questions + flashcards are saved — open them again.
+                if (!keyboardOpen && notes.material != null && !notes.isGenerating) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  PixelButton(
+                    label: 'Open Study Patch',
+                    icon: Icons.menu_book,
+                    tone: ButtonTone.secondary,
+                    height: 44,
+                    onPressed: _openMaterial,
+                  ),
+                ],
                 if (!keyboardOpen && notes.isGenerating) ...[
                   const SizedBox(height: AppSpacing.md),
                   PixelPanel(
