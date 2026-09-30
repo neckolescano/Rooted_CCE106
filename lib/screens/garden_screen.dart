@@ -121,7 +121,7 @@ class _GardenDiorama extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SceneFrame(
-      scene: scene,
+      look: scene.look,
       // Horizon about halfway down: sky behind the sign, grass behind the bed.
       imageAlignment: const Alignment(0.5, 0.4),
       children: [

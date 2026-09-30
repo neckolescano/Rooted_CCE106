@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'card_designs.dart' show QuestStats;
+import 'scene_look.dart';
 import 'secrets.dart';
 
-/// Moving pixel effects drawn over a scene (see widgets/garden_scene_backdrop.dart).
-enum SceneEffect { sun, moon, stars, petals, rain, fireflies, leaves, aurora, snow, autumnLeaves, lanterns, rainbow, owlEyes }
+export 'scene_look.dart';
 
 /// One Garden Scene: the world outside — shown behind the Timer, in the
 /// Garden Archive picture and through the Home greenhouse window. Unlocked
@@ -17,14 +17,12 @@ class GardenScene {
     required this.quest,
     required this.progressOf,
     required this.goal,
-    this.tint,
-    this.effects = const [],
-    this.asset = meadowPicture,
+    required this.look,
     this.secret = false,
     this.hint,
   });
 
-  static const meadowPicture = 'assets/images/backgrounds/garden_meadow.png';
+  static const meadowPicture = SceneLooks.meadowLand;
 
   final String id;
   final String name;
@@ -37,14 +35,11 @@ class GardenScene {
   final int Function(QuestStats) progressOf;
   final int goal;
 
-  /// Colour wash over the meadow picture (null = the normal meadow).
-  /// Multiplied in, so all the pixel detail stays.
-  final int? tint;
-  final List<SceneEffect> effects;
+  /// Its sky, land picture and moving effects (see models/scene_look.dart).
+  final SceneLook look;
 
-  /// The background picture (drawn by tool/generate_meadow.dart): the
-  /// summer meadow, or its autumn / winter version.
-  final String asset;
+  String get asset => look.land;
+  List<SceneEffect> get effects => look.effects;
 
   /// A secret scene hides its name and picture until it is found; only
   /// [hint] is shown (see models/secrets.dart).
@@ -68,6 +63,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Your starter scene.',
     progressOf: (_) => 1,
     goal: 1,
+    look: SceneLooks.meadow,
   ),
   GardenScene(
     id: 'sunset',
@@ -76,8 +72,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 3 focus sessions.',
     progressOf: (s) => s.completedSessions,
     goal: 3,
-    tint: 0xFFFFB27A,
-    effects: [SceneEffect.sun],
+    look: SceneLooks.sunset,
   ),
   GardenScene(
     id: 'cherry',
@@ -86,8 +81,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Grow 2 plants.',
     progressOf: (s) => s.harvestedPlants,
     goal: 2,
-    tint: 0xFFFFD6E4,
-    effects: [SceneEffect.petals],
+    look: SceneLooks.cherry,
   ),
   GardenScene(
     id: 'rainy',
@@ -96,8 +90,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 10 focus sessions.',
     progressOf: (s) => s.completedSessions,
     goal: 10,
-    tint: 0xFF8497A8, // grey-blue: an overcast, rainy day
-    effects: [SceneEffect.rain],
+    look: SceneLooks.rainy,
   ),
   GardenScene(
     id: 'starry',
@@ -106,8 +99,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 4 focus sessions in a row.',
     progressOf: (s) => s.streak,
     goal: 4,
-    tint: 0xFF3E4C8C,
-    effects: [SceneEffect.stars, SceneEffect.moon, SceneEffect.fireflies],
+    look: SceneLooks.starry,
   ),
   GardenScene(
     id: 'forest',
@@ -116,8 +108,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Grow a Forest Fern.',
     progressOf: (s) => s.grown('forest_fern'),
     goal: 1,
-    tint: 0xFF6E9A66,
-    effects: [SceneEffect.fireflies, SceneEffect.leaves],
+    look: SceneLooks.forest,
   ),
   GardenScene(
     id: 'autumn',
@@ -126,8 +117,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Grow 4 plants.',
     progressOf: (s) => s.harvestedPlants,
     goal: 4,
-    asset: 'assets/images/backgrounds/garden_meadow_autumn.png',
-    effects: [SceneEffect.autumnLeaves],
+    look: SceneLooks.autumn,
   ),
   GardenScene(
     id: 'rainbow',
@@ -136,8 +126,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Reach garden level 5.',
     progressOf: (s) => s.gardenLevel,
     goal: 5,
-    tint: 0xFFFFF6E8,
-    effects: [SceneEffect.rainbow],
+    look: SceneLooks.rainbow,
   ),
   GardenScene(
     id: 'lantern',
@@ -146,8 +135,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 7 focus sessions in a row.',
     progressOf: (s) => s.streak,
     goal: 7,
-    tint: 0xFF7A68A0, // purple dusk
-    effects: [SceneEffect.stars, SceneEffect.lanterns],
+    look: SceneLooks.lantern,
   ),
   GardenScene(
     id: 'winter',
@@ -156,8 +144,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 30 focus sessions.',
     progressOf: (s) => s.completedSessions,
     goal: 30,
-    asset: 'assets/images/backgrounds/garden_meadow_winter.png',
-    effects: [SceneEffect.snow],
+    look: SceneLooks.winter,
   ),
   GardenScene(
     id: 'aurora',
@@ -166,8 +153,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish 50 focus sessions.',
     progressOf: (s) => s.completedSessions,
     goal: 50,
-    tint: 0xFF2C4266, // deep polar night
-    effects: [SceneEffect.stars, SceneEffect.aurora],
+    look: SceneLooks.aurora,
   ),
   // The secret scene: kuwago's hidden home.
   GardenScene(
@@ -177,8 +163,7 @@ final List<GardenScene> gardenScenes = [
     quest: 'Finish a focus session of 60 minutes or more without pausing.',
     progressOf: (s) => s.secrets.contains(Secrets.deepFocus) ? 1 : 0,
     goal: 1,
-    tint: 0xFF3A6A6E, // moonlit teal
-    effects: [SceneEffect.stars, SceneEffect.moon, SceneEffect.fireflies, SceneEffect.owlEyes],
+    look: SceneLooks.owlGrove,
     secret: true,
     hint: 'kuwago whispers: "Stay one whole hour without a single pause."',
   ),

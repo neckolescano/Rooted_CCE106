@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/garden_scenes.dart';
+import '../models/scene_look.dart';
 import '../theme/app_theme.dart';
 import 'garden_scene_backdrop.dart';
 import 'pixel_panel.dart';
@@ -18,12 +18,16 @@ class SceneFrame extends StatelessWidget {
     this.imageAlignment = Alignment.center,
     this.tint,
     this.golden = false,
-    this.scene,
+    this.look,
+    this.animate = true,
   });
 
-  /// Show the meadow in this Garden Scene (colour wash + moving effects)
-  /// instead of [asset] + [tint] — the Garden Archive uses the equipped one.
-  final GardenScene? scene;
+  /// Show this scene look (its own sky, land and moving effects) instead
+  /// of [asset] + [tint] — the Garden Archive and Player Cards use this.
+  final SceneLook? look;
+
+  /// false = keep the look still (small thumbnails).
+  final bool animate;
 
   final List<Widget> children;
   final String asset;
@@ -50,10 +54,11 @@ class SceneFrame extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) => const ColoredBox(color: Color(0xFFAFD8C9)),
     );
     final wash = tint;
-    final scene = this.scene;
-    if (scene != null) {
+    final look = this.look;
+    if (look != null) {
       picture = GardenSceneBackdrop(
-        scene: scene,
+        look: look,
+        animate: animate,
         alignment: imageAlignment,
         pixel: 1.5,
         filterQuality: FilterQuality.medium,

@@ -15,7 +15,6 @@ import '../widgets/pixel_button.dart';
 import '../widgets/pixel_dialog.dart';
 import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
-import '../widgets/pixel_progress_bar.dart';
 import '../widgets/pixel_timer_display.dart';
 import '../widgets/plant_aura.dart';
 import '../widgets/plant_display.dart';
@@ -49,8 +48,54 @@ class _TimerScreenState extends State<TimerScreen> {
   // call went through. See initState() below for why this exists.
   bool _sessionStarted = false;
 
+  // Scenery mode: the panels and buttons fade away so the student can just
+  // enjoy the Garden Scene; only the time floats on top, without a frame.
+  // A tap anywhere (or Android back) brings everything back.
+  bool _sceneryMode = false;
+  // The "tap anywhere" hint shows for a few seconds after entering.
+  bool _showSceneryHint = false;
+
   // See-through dark panel so text stays readable over the meadow.
   static const _glassDark = Color(0xE63E2A1B);
+
+  void _enterScenery() {
+    setState(() {
+      _sceneryMode = true;
+      _showSceneryHint = true;
+    });
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showSceneryHint = false);
+    });
+  }
+
+  void _exitScenery() => setState(() => _sceneryMode = false);
+
+  /// Fades [child] out (and makes it untappable) in scenery mode.
+  Widget _hideable(bool hidden, Widget child) => IgnorePointer(
+        ignoring: hidden,
+        child: AnimatedOpacity(
+          opacity: hidden ? 0 : 1,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOut,
+          child: child,
+        ),
+      );
+
+  /// The time on its own, floating over the scene. A hard pixel shadow
+  /// keeps it readable on light skies and dark ones.
+  Widget _floatingTime(SessionModel session, bool isPaused) {
+    const shadow = [Shadow(color: Color(0xB3000000), offset: Offset(3, 3))];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          session.formattedTime,
+          style: AppTheme.pixelHeading(size: 56, color: AppColors.textCream).copyWith(shadows: shadow),
+        ),
+        if (isPaused) Text('PAUSED', style: AppText.caption(color: AppColors.accentGold).copyWith(shadows: shadow)),
+      ],
+    );
+  }
 
   @override
   void dispose() {
@@ -225,7 +270,8 @@ class _TimerScreenState extends State<TimerScreen> {
       // Dark enough that the popup is clearly the focus, but the meadow
       // still shows through faintly.
       barrierColor: AppColors.overlay,
-      builder: (_) => HarvestCelebrationDialog(plantAsset: grown.fullGrownAsset, plantName: grown.name, aura: grown.aura),
+      builder: (_) =>
+          HarvestCelebrationDialog(plantAsset: grown.fullGrownAsset, plantName: grown.name, aura: grown.aura),
     );
 
     if (!mounted) return;
@@ -256,7 +302,10 @@ class _TimerScreenState extends State<TimerScreen> {
     final session = context.watch<SessionModel>();
     final plant = context.watch<PlantModel>();
     final isPaused = session.status == SessionStatus.paused;
-    final progress = session.progress;
+    // The equipped Garden Scene (Garden page → Garden scenes).
+    final scene = gardenSceneById(context.select<StorageService, String>((s) => s.gardenScene));
+    // The growth animation always shows the full screen.
+    final scenery = _sceneryMode && !_isGrowing;
 
     // React the moment the countdown hits zero. The _sessionStarted
     // check matters: without it, this could misfire on a leftover
@@ -272,7 +321,13 @@ class _TimerScreenState extends State<TimerScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _confirmGiveUp();
+        if (didPop) return;
+        // In scenery mode, back just brings the controls back.
+        if (scenery) {
+          _exitScenery();
+        } else {
+          _confirmGiveUp();
+        }
       },
       child: Scaffold(
         // This screen is pushed as its own route (not inside MainShell), so
@@ -282,129 +337,179 @@ class _TimerScreenState extends State<TimerScreen> {
         body: SafeArea(
           child: BackgroundScene(
             // The equipped Garden Scene (Garden page → Garden scenes).
-            scene: gardenSceneById(context.select<StorageService, String>((s) => s.gardenScene)),
-            child: Padding(
-              padding: AppSpacing.screen,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+            scene: scene,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: AppSpacing.screen,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      PixelPanel(
-                        style: PanelStyle.dark,
-                        expand: false,
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
-                        child: Text('SESSION EN ROUTE', style: AppText.panelTitle()),
-                      ),
-                      const Spacer(),
-                      // Opens the Notes page. This just pushes on top of
-                      // the existing route — SessionModel isn't touched,
-                      // so the countdown keeps running underneath exactly
-                      // as it was, and this screen's own state (like
-                      // _isGrowing) is preserved too since it's never
-                      // disposed, just paused off-screen.
-                      PixelIconButton(
-                        icon: Icons.edit_note,
-                        label: 'NOTES',
-                        semanticLabel: 'Open study notes. The timer keeps running.',
-                        // Off while the plant is growing, so nothing can
-                        // open on top during the growth animation.
-                        onPressed: _isGrowing
-                            ? null
-                            : () => Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => const NotesScreen()),
-                                ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  PixelTimerDisplay(
-                    time: session.formattedTime,
-                    label: isPaused ? 'PAUSED' : 'FOCUS MODE',
-                  ),
-                  const SizedBox(height: 10),
-                  PixelPanel(
-                    style: PanelStyle.dark,
-                    backgroundColor: _glassDark,
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, 10, AppSpacing.md, AppSpacing.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text('PLANT GROWTH', style: AppText.caption(color: AppColors.textCream))),
-                            Text('${(progress * 100).round()}%', style: AppText.caption(color: AppColors.accentGold)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        PixelProgressBar(value: progress, height: 12, semanticLabel: 'Session progress'),
-                      ],
-                    ),
-                  ),
-                  // This open space is where the meadow background actually
-                  // gets to show — the plant sits IN the scene.
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final size = _plantSizeFor(constraints);
-                        return Center(
-                          child: _isGrowing
-                              ? PlantAuraEffect(
-                                  aura: plant.species.aura,
-                                  strength: PlantAuraEffect.strengthForStage(plant.stage.index + 1),
-                                  child: GrowthTransitionPlayer(
-                                    plant: plant,
-                                    transitionKey: _growthTransitionKey!,
-                                    onFinished: _finishSession,
-                                    size: size,
+                      _hideable(
+                          scenery,
+                          Row(
+                            children: [
+                              // A little wooden tag naming the scene you're in.
+                              Flexible(
+                                child: PixelPanel(
+                                  style: PanelStyle.dark,
+                                  expand: false,
+                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
+                                  child: Text(
+                                    '${scene.emoji} ${scene.name.toUpperCase()}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppText.panelTitle(),
                                   ),
-                                )
-                              : PlantDisplay(plant: plant, size: size),
-                        );
-                      },
-                    ),
-                  ),
-                  PixelPanel(
-                    style: PanelStyle.dark,
-                    backgroundColor: _glassDark,
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
-                    child: Text(
-                      'Your ${plant.stage.label} is growing quietly. '
-                      'Keep off social media until the timer runs out!',
-                      textAlign: TextAlign.center,
-                      style: AppTheme.body(size: 12, color: AppColors.textCream, weight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
+                                ),
+                              ),
+                              const Spacer(),
+                              // Scenery mode: hide everything but the time.
+                              PixelIconButton(
+                                icon: Icons.landscape_outlined,
+                                semanticLabel:
+                                    'Hide the controls and enjoy the scene. Tap anywhere to bring them back.',
+                                onPressed: _isGrowing ? null : _enterScenery,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              // Opens the Notes page. This just pushes on top of
+                              // the existing route — SessionModel isn't touched,
+                              // so the countdown keeps running underneath exactly
+                              // as it was, and this screen's own state (like
+                              // _isGrowing) is preserved too since it's never
+                              // disposed, just paused off-screen.
+                              PixelIconButton(
+                                icon: Icons.edit_note,
+                                label: 'NOTES',
+                                semanticLabel: 'Open study notes. The timer keeps running.',
+                                // Off while the plant is growing, so nothing can
+                                // open on top during the growth animation.
+                                onPressed: _isGrowing
+                                    ? null
+                                    : () => Navigator.of(context).push(
+                                          MaterialPageRoute(builder: (_) => const NotesScreen()),
+                                        ),
+                              ),
+                            ],
+                          )),
+                      const SizedBox(height: AppSpacing.md),
+                      _hideable(
+                          scenery,
+                          PixelTimerDisplay(
+                            time: session.formattedTime,
+                            label: isPaused ? 'PAUSED' : 'FOCUS MODE',
+                          )),
+                      // This open space is where the meadow background actually
+                      // gets to show — the plant sits IN the scene.
                       Expanded(
-                        child: PixelButton(
-                          label: isPaused ? 'Resume' : 'Pause',
-                          icon: isPaused ? Icons.play_arrow : Icons.pause,
-                          onPressed: _isGrowing
-                              ? null
-                              : () {
-                                  if (isPaused) {
-                                    session.resume();
-                                  } else {
-                                    session.pause();
-                                  }
-                                },
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final size = _plantSizeFor(constraints);
+                            return Center(
+                              child: _isGrowing
+                                  ? PlantAuraEffect(
+                                      aura: plant.species.aura,
+                                      strength: PlantAuraEffect.strengthForStage(plant.stage.index + 1),
+                                      child: GrowthTransitionPlayer(
+                                        plant: plant,
+                                        transitionKey: _growthTransitionKey!,
+                                        onFinished: _finishSession,
+                                        size: size,
+                                      ),
+                                    )
+                                  : PlantDisplay(plant: plant, size: size),
+                            );
+                          },
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: PixelButton(
-                          label: 'Give Up',
-                          tone: ButtonTone.danger,
-                          onPressed: _isGrowing ? null : _confirmGiveUp,
-                        ),
-                      ),
+                      _hideable(
+                          scenery,
+                          PixelPanel(
+                            style: PanelStyle.dark,
+                            backgroundColor: _glassDark,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                            child: Text(
+                              'Your ${plant.stage.label} is growing quietly. '
+                              'Keep off social media until the timer runs out!',
+                              textAlign: TextAlign.center,
+                              style: AppTheme.body(size: 12, color: AppColors.textCream, weight: FontWeight.w600),
+                            ),
+                          )),
+                      const SizedBox(height: AppSpacing.md),
+                      _hideable(
+                          scenery,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: PixelButton(
+                                  label: isPaused ? 'Resume' : 'Pause',
+                                  icon: isPaused ? Icons.play_arrow : Icons.pause,
+                                  onPressed: _isGrowing
+                                      ? null
+                                      : () {
+                                          if (isPaused) {
+                                            session.resume();
+                                          } else {
+                                            session.pause();
+                                          }
+                                        },
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: PixelButton(
+                                  label: 'Give Up',
+                                  tone: ButtonTone.danger,
+                                  onPressed: _isGrowing ? null : _confirmGiveUp,
+                                ),
+                              ),
+                            ],
+                          )),
                     ],
                   ),
-                ],
-              ),
+                ),
+                // Scenery mode: a tap anywhere brings the controls back…
+                if (scenery)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _exitScenery,
+                      child: Semantics(button: true, label: 'Show the controls'),
+                    ),
+                  ),
+                // …and the time floats on its own, no frame.
+                Positioned(
+                  top: 72,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: scenery ? 1 : 0,
+                      duration: const Duration(milliseconds: 350),
+                      child: Center(child: _floatingTime(session, isPaused)),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 28,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: scenery && _showSceneryHint ? 1 : 0,
+                      duration: const Duration(milliseconds: 500),
+                      child: Center(
+                        child: Text(
+                          'Tap anywhere to show the controls',
+                          style: AppTheme.body(size: 12, color: AppColors.textCream, weight: FontWeight.w600).copyWith(
+                            shadows: const [Shadow(color: Color(0xB3000000), offset: Offset(2, 2))],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

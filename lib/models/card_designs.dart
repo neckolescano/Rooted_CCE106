@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'scene_look.dart';
 
 /// The numbers quests are checked against (all already tracked by the app).
 class QuestStats {
@@ -25,9 +26,6 @@ class QuestStats {
   int grown(String speciesId) => grownBySpecies[speciesId] ?? 0;
 }
 
-/// Extra decorations drawn on top of a card cover (all pixel art in code).
-enum CoverExtra { none, sun, petals, stars, sand, fireflies, moon, sparkles }
-
 /// One Player Card design: how it looks + the quest that unlocks it.
 class CardDesign {
   const CardDesign({
@@ -36,8 +34,7 @@ class CardDesign {
     required this.quest,
     required this.progressOf,
     required this.goal,
-    this.tint,
-    this.extras = const [],
+    required this.look,
     this.sprite,
     this.owl = false,
     this.golden = false,
@@ -53,9 +50,9 @@ class CardDesign {
   final int Function(QuestStats) progressOf;
   final int goal;
 
-  /// Colour wash over the meadow picture (null = the normal meadow).
-  final int? tint;
-  final List<CoverExtra> extras;
+  /// The picture behind the card: sky, land and moving effects
+  /// (the same looks as the Garden Scenes — see models/scene_look.dart).
+  final SceneLook look;
 
   /// Optional plant sprite standing in the corner of the cover.
   final String? sprite;
@@ -74,8 +71,8 @@ class CardDesign {
 const defaultCardDesign = 'meadow';
 
 /// Every design, in the order shown on the Profile shelf.
-/// To add one: add an entry here (and, if it needs a new decoration, a
-/// CoverExtra + its drawing in widgets/card_cover.dart).
+/// To add one: add an entry here (and, for a new look, a SceneLook in
+/// models/scene_look.dart).
 final List<CardDesign> cardDesigns = [
   CardDesign(
     id: 'meadow',
@@ -83,6 +80,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Your starter card.',
     progressOf: (_) => 1,
     goal: 1,
+    look: SceneLooks.meadow,
   ),
   CardDesign(
     id: 'sunset',
@@ -90,8 +88,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Finish 5 focus sessions.',
     progressOf: (s) => s.completedSessions,
     goal: 5,
-    tint: 0xFFFFB27A,
-    extras: [CoverExtra.sun],
+    look: SceneLooks.sunset,
   ),
   CardDesign(
     id: 'cherry',
@@ -99,8 +96,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Grow 3 plants.',
     progressOf: (s) => s.harvestedPlants,
     goal: 3,
-    tint: 0xFFFFD6E4,
-    extras: [CoverExtra.petals],
+    look: SceneLooks.cherry,
   ),
   CardDesign(
     id: 'starry',
@@ -108,8 +104,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Get 5 focus sessions in a row.',
     progressOf: (s) => s.streak,
     goal: 5,
-    tint: 0xFF3E4C8C,
-    extras: [CoverExtra.stars, CoverExtra.moon],
+    look: SceneLooks.starry,
   ),
   CardDesign(
     id: 'desert',
@@ -117,8 +112,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Grow a Desert Cactus.',
     progressOf: (s) => s.grown('desert_cactus'),
     goal: 1,
-    tint: 0xFFF2C47A,
-    extras: [CoverExtra.sun, CoverExtra.sand],
+    look: SceneLooks.desert,
     sprite: 'assets/images/plants/desert_cactus/stages/fullgrown.png',
   ),
   CardDesign(
@@ -127,8 +121,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Grow a Forest Fern.',
     progressOf: (s) => s.grown('forest_fern'),
     goal: 1,
-    tint: 0xFF6E9A66,
-    extras: [CoverExtra.fireflies],
+    look: SceneLooks.forest,
     sprite: 'assets/images/plants/forest_fern/stages/fullgrown.png',
   ),
   CardDesign(
@@ -137,8 +130,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Grow a Moonpetal Lily.',
     progressOf: (s) => s.grown('moonpetal_lily'),
     goal: 1,
-    tint: 0xFF7563B8,
-    extras: [CoverExtra.moon, CoverExtra.sparkles],
+    look: SceneLooks.moonlit,
     sprite: 'assets/images/plants/moonpetal_lily/stages/fullgrown.png',
   ),
   CardDesign(
@@ -147,8 +139,7 @@ final List<CardDesign> cardDesigns = [
     quest: 'Reach garden level 5.',
     progressOf: (s) => s.gardenLevel,
     goal: 5,
-    tint: 0xFFFFE08A,
-    extras: [CoverExtra.sparkles],
+    look: SceneLooks.golden,
     owl: true,
     golden: true,
   ),
