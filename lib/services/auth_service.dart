@@ -94,6 +94,9 @@ class AuthService {
   /// Turns Firebase's technical error codes into something a student
   /// can actually act on.
   static String friendlyError(Object error) {
+    // The student sees a friendly line; the log keeps the real error so a
+    // failure on a tester's phone can still be diagnosed (adb logcat).
+    debugPrint('[Auth] sign-in failed: $error');
     if (error is GoogleSignInException) {
       if (error.code == GoogleSignInExceptionCode.canceled) return 'Sign-in was cancelled.';
       return "Google sign-in didn't work. Please try again.";

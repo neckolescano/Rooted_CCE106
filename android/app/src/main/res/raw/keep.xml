@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release builds strip resources that look unused. The study reminder's
-     notification icon is only referenced by name from Dart
-     (ReminderService), so it must be kept explicitly. -->
+<!-- Release builds strip resources that look unused. These are only looked
+     up by name at runtime, so they must be kept explicitly:
+     - ic_stat_kuwago: the study reminder's notification icon (ReminderService).
+     - default_web_client_id: made from google-services.json; Google Sign-In
+       reads it as the serverClientId ("serverClientId must be provided"). -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_kuwago" />
+    tools:keep="@drawable/ic_stat_kuwago,@string/default_web_client_id" />

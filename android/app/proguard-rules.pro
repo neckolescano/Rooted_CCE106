@@ -7,3 +7,9 @@
 -keep class * extends com.google.gson.reflect.TypeToken
 -keepattributes Signature
 -keepattributes *Annotation*
+
+# Google Sign-In (google_sign_in v7 uses Android Credential Manager). Its
+# Play Services provider is only found by reflection, so shrinking deletes
+# it and the account sheet never appears in release builds.
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** { *; }
