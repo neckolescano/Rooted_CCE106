@@ -700,15 +700,20 @@ class _CollectibleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                unlocked ? species.name.toUpperCase() : '???',
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTheme.body(
-                  size: 11,
-                  color: unlocked ? AppColors.textDark : AppColors.textCream,
-                  weight: FontWeight.w900,
+              // Always ONE line, so every card's picture box is the same
+              // size; a long name (Wild Sunflower, Golden Glory Tree…)
+              // shrinks a little to fit instead of wrapping.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  unlocked ? species.name.toUpperCase() : '???',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: AppTheme.body(
+                    size: 11,
+                    color: unlocked ? AppColors.textDark : AppColors.textCream,
+                    weight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),

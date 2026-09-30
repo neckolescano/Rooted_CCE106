@@ -119,6 +119,7 @@ class SessionModel extends ChangeNotifier {
 
   /// Student taps "Give Up" — session fails, plant should wilt.
   void giveUp() {
+    debugPrint('[Session] given up at $formattedTime left.');
     _frozenLeft = secondsLeft; // so elapsedSeconds is still right
     _ticker?.cancel();
     _endsAt = null;
@@ -136,6 +137,7 @@ class SessionModel extends ChangeNotifier {
 
   /// Reset back to idle so the Home screen shows "Start Study Session" again.
   void reset() {
+    debugPrint('[Session] reset from $status.');
     _ticker?.cancel();
     _endsAt = null;
     _awaitingRecord = false;
@@ -148,6 +150,7 @@ class SessionModel extends ChangeNotifier {
   /// there is one to go back to (running, paused, or finished meanwhile).
   bool restore() {
     final raw = _prefs?.getString(_saveKey);
+    debugPrint('[Session] restore: saved = $raw');
     if (raw == null) return false;
     try {
       final saved = Map<String, dynamic>.from(jsonDecode(raw) as Map);

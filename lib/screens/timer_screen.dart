@@ -349,21 +349,28 @@ class _TimerScreenState extends State<TimerScreen> {
                           scenery,
                           Row(
                             children: [
-                              // A little wooden tag naming the scene you're in.
-                              Flexible(
-                                child: PixelPanel(
-                                  style: PanelStyle.dark,
-                                  expand: false,
-                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
-                                  child: Text(
-                                    '${scene.emoji} ${scene.name.toUpperCase()}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppText.panelTitle(),
+                              // A little wooden tag naming the scene you're in. It
+                              // may use all the room left of the buttons, and a long
+                              // name shrinks to fit instead of being cut off.
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: PixelPanel(
+                                    style: PanelStyle.dark,
+                                    expand: false,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        '${scene.emoji} ${scene.name.toUpperCase()}',
+                                        maxLines: 1,
+                                        style: AppText.caption(color: AppColors.textCream),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: AppSpacing.sm),
                               // Scenery mode: hide everything but the time.
                               PixelIconButton(
                                 icon: Icons.landscape_outlined,
