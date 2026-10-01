@@ -88,7 +88,9 @@ class _StudyOptionsDialogState extends State<_StudyOptionsDialog> {
             ),
           ),
           Text(
-            bigRequest
+            _o.isBatched
+                ? '⏳ Big patch! It grows in batches of 20 and can take a minute or two.'
+                : bigRequest
                 ? '⏳ Big patch! This can take up to a minute to grow.'
                 : 'Short notes may give fewer items — the AI only uses what\'s in your notes.',
             textAlign: TextAlign.center,

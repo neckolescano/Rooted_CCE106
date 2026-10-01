@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
 import '../models/study_material.dart';
@@ -26,6 +27,11 @@ class AiServiceException implements Exception {
 /// key. Requests go to Firebase, which holds the credentials on its
 /// side, and App Check makes sure only your real app can use it.
 class AiService {
+  AiService({@visibleForTesting this.askBatchForTest});
+
+  /// Tests only: answers each batch instead of Gemini (see test/ai_batching_test.dart).
+  final Future<StudyMaterial?> Function(String prompt, StudyOptions options)? askBatchForTest;
+
   /// Models to try, in order. If one is overloaded, out of free quota, or
   /// too slow, the next one is used. All are stable models from
   /// https://firebase.google.com/docs/ai-logic/models — if Google retires
@@ -55,48 +61,80 @@ class AiService {
   static const _appCheckTimeout = Duration(seconds: 10);
 
   /// [options] = the choices from the "Grow your study patch" scroll.
-  Future<StudyMaterial> generateStudyMaterial(String notes, [StudyOptions options = const StudyOptions()]) async {
+  ///
+  /// A big patch (more than [StudyOptions.batchSize] questions or
+  /// flashcards) is made in batches; [onProgress] reports how many items
+  /// are ready so far. If a later batch fails, or the notes run out, the
+  /// student keeps everything made up to then.
+  Future<StudyMaterial> generateStudyMaterial(
+    String notes, [
+    StudyOptions options = const StudyOptions(),
+    void Function(int made, int total)? onProgress,
+  ]) async {
     try {
       // 1. App Check. If the project ENFORCES it, requests without a valid
       //    token are rejected — so check first and leave a clear trail in
       //    the Debug Console. We still try the request either way (it
       //    works without a token while enforcement is off); if Firebase
       //    then rejects it, _explain() turns that into the App Check hint.
-      _appCheckOk = await _checkAppCheckToken();
+      if (askBatchForTest == null) _appCheckOk = await _checkAppCheckToken();
 
-      // 2. Ask Gemini — retrying / switching model while it's busy, within
-      //    a total time budget.
-      final prompt = buildStudyMaterialPrompt(notes, options);
-      debugPrint('[AI] asking for ${options.wantsQuestions ? options.questionCount : 0} questions '
-          '(${options.style.name}, ${options.difficulty.name}) + '
-          '${options.wantsFlashcards ? options.flashcardCount : 0} flashcards');
-      final clock = Stopwatch()..start();
-      for (final modelName in _models) {
-        for (var attempt = 1; attempt <= _triesPerModel; attempt++) {
-          if (clock.elapsed > _totalBudget(options)) break;
-          try {
-            final text = await _ask(modelName, prompt, options);
-            // 3. Turn the reply into questions + flashcards, trimmed to
-            //    exactly what the student asked for.
-            return _fit(_parse(text), options);
-          } on AiServiceException {
-            rethrow; // e.g. empty/garbled reply — not worth retrying
-          } on TimeoutException {
-            // Some models hang on the free tier while others answer fast —
-            // don't wait again, move on to the next model.
-            debugPrint('[AI] $modelName took over ${_requestTimeout(options).inSeconds}s — trying the next model');
-            break;
-          } catch (error) {
-            final busy = _busyKind(error);
-            if (busy == null) rethrow; // a real problem (App Check, blocked…) — explain it
-            debugPrint('[AI] $modelName is busy ($busy), attempt $attempt of $_triesPerModel');
-            if (busy == 'quota') break; // this model's free quota is used up → next model
-            if (attempt < _triesPerModel) await Future<void>.delayed(Duration(seconds: 2 * attempt));
+      // 2. Ask Gemini, one batch at a time.
+      final wantQ = options.wantsQuestions ? options.questionCount : 0;
+      final wantF = options.wantsFlashcards ? options.flashcardCount : 0;
+      final questions = <StudyQuestion>[];
+      final flashcards = <Flashcard>[];
+      for (var batch = 1; questions.length < wantQ || flashcards.length < wantF; batch++) {
+        final askQ = min(wantQ - questions.length, StudyOptions.batchSize);
+        final askF = min(wantF - flashcards.length, StudyOptions.batchSize);
+        final ask = options.copyWith(
+          make: askQ == 0 ? StudyMake.flashcardsOnly : (askF == 0 ? StudyMake.questionsOnly : StudyMake.both),
+          questionCount: max(askQ, 1),
+          flashcardCount: max(askF, 1),
+        );
+        final alreadyMade = [for (final q in questions) q.question, for (final f in flashcards) f.front];
+        debugPrint('[AI] batch $batch: asking for $askQ questions '
+            '(${options.style.name}, ${options.difficulty.name}) + $askF flashcards');
+
+        final StudyMaterial? got;
+        try {
+          got = await (askBatchForTest ?? _askWithRetries)(buildStudyMaterialPrompt(notes, ask, alreadyMade), ask);
+        } catch (error) {
+          if (batch == 1) rethrow; // nothing made yet: explain it / go offline
+          debugPrint('[AI] batch $batch failed, keeping what was made: $error');
+          break;
+        }
+        if (got == null) {
+          if (batch == 1) {
+            return _offlineOr(notes, options, 'The study AI is very busy right now. Wait a minute and try again.');
           }
+          break; // keep the earlier batches
+        }
+
+        // Add only new items (the AI can still repeat itself now and then).
+        final seenQ = {for (final q in questions) _key(q.question)};
+        final seenF = {for (final f in flashcards) _key(f.front)};
+        final newQ = got.questions.where((q) => seenQ.add(_key(q.question))).take(askQ).toList();
+        final newF = got.flashcards.where((f) => seenF.add(_key(f.front))).take(askF).toList();
+        questions.addAll(newQ);
+        flashcards.addAll(newF);
+        onProgress?.call(questions.length + flashcards.length, wantQ + wantF);
+
+        // The AI sending back fewer than asked = the notes have nothing more
+        // to ask about. (Repeats it sent are dropped above and simply asked
+        // for again in the next batch — that's not the notes running out.)
+        if (got.questions.length < askQ || got.flashcards.length < askF) {
+          debugPrint('[AI] the notes ran out after batch $batch');
+          break;
+        }
+        if (newQ.isEmpty && newF.isEmpty) break; // only repeats: stop asking
+        if (batch >= _maxBatches(wantQ, wantF)) {
+          debugPrint('[AI] stopping after $batch batches (too many repeats)');
+          break;
         }
       }
-      debugPrint('[AI] no model answered in time (${clock.elapsed.inSeconds}s)');
-      return _offlineOr(notes, options, 'The study AI is very busy right now. Wait a minute and try again.');
+      debugPrint('[AI] kept ${questions.length} questions and ${flashcards.length} flashcards');
+      return StudyMaterial(questions: questions, flashcards: flashcards);
     } on AiServiceException {
       rethrow;
     } on TimeoutException {
@@ -115,16 +153,47 @@ class AiService {
     }
   }
 
-  /// Drops what wasn't asked for and anything beyond the requested counts
-  /// (the AI sometimes adds a bonus item or two).
-  StudyMaterial _fit(StudyMaterial m, StudyOptions o) {
-    final fitted = StudyMaterial(
-      questions: o.wantsQuestions ? m.questions.take(o.questionCount).toList() : const [],
-      flashcards: o.wantsFlashcards ? m.flashcards.take(o.flashcardCount).toList() : const [],
-    );
-    debugPrint('[AI] kept ${fitted.questions.length} questions and ${fitted.flashcards.length} flashcards');
-    return fitted;
+  /// One batch: asks Gemini, retrying / switching model while it's busy,
+  /// within a time budget. null = no model answered in time.
+  Future<StudyMaterial?> _askWithRetries(String prompt, StudyOptions options) async {
+    final clock = Stopwatch()..start();
+    for (final modelName in _models) {
+      for (var attempt = 1; attempt <= _triesPerModel; attempt++) {
+        if (clock.elapsed > _totalBudget(options)) break;
+        try {
+          final text = await _ask(modelName, prompt, options);
+          final m = _parse(text);
+          // Drop what wasn't asked for (the AI sometimes adds extras).
+          return StudyMaterial(
+            questions: options.wantsQuestions ? m.questions : const [],
+            flashcards: options.wantsFlashcards ? m.flashcards : const [],
+          );
+        } on AiServiceException {
+          rethrow; // e.g. empty/garbled reply — not worth retrying
+        } on TimeoutException {
+          // Some models hang on the free tier while others answer fast —
+          // don't wait again, move on to the next model.
+          debugPrint('[AI] $modelName took over ${_requestTimeout(options).inSeconds}s — trying the next model');
+          break;
+        } catch (error) {
+          final busy = _busyKind(error);
+          if (busy == null) rethrow; // a real problem (App Check, blocked…) — explain it
+          debugPrint('[AI] $modelName is busy ($busy), attempt $attempt of $_triesPerModel');
+          if (busy == 'quota') break; // this model's free quota is used up → next model
+          if (attempt < _triesPerModel) await Future<void>.delayed(Duration(seconds: 2 * attempt));
+        }
+      }
+    }
+    debugPrint('[AI] no model answered in time (${clock.elapsed.inSeconds}s)');
+    return null;
   }
+
+  /// The batches a patch needs, plus one spare to replace repeats (so a
+  /// repeating AI can't use up the daily quota).
+  static int _maxBatches(int wantQ, int wantF) => (max(wantQ, wantF) / StudyOptions.batchSize).ceil() + 1;
+
+  /// For spotting repeats: lower case, letters and digits only.
+  static String _key(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
   /// The AI couldn't answer in time (busy / slow / offline): make simpler
   /// study material on the phone instead, so the student always gets

@@ -156,7 +156,13 @@ class _NotesScreenState extends State<NotesScreen> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text('Your garden companion is reading your notes...', style: AppText.small()),
+                          // A big patch grows in batches: show how far along it is.
+                          child: Text(
+                            notes.progressTotal > 0
+                                ? 'Growing your study patch... ${notes.progressMade} / ${notes.progressTotal}'
+                                : 'Your garden companion is reading your notes...',
+                            style: AppText.small(),
+                          ),
                         ),
                       ],
                     ),

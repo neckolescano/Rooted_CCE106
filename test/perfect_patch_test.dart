@@ -36,12 +36,22 @@ Future<StorageService> pumpPatch(WidgetTester tester, List<StudyQuestion> questi
   return storage;
 }
 
+/// The quiz shows one question at a time: pick [choice], then Next / Finish.
+Future<void> answer(WidgetTester tester, String choice, {bool thenNext = true}) async {
+  await tester.tap(find.text(choice));
+  await tester.pump(const Duration(milliseconds: 600));
+  if (!thenNext) return;
+  final next = find.text('NEXT');
+  await tester.tap(next.evaluate().isNotEmpty ? next : find.text('FINISH'));
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
 void main() {
   testWidgets('all right on the first try unlocks Owlbloom and shows the popup', (tester) async {
     final storage = await pumpPatch(tester, [for (var i = 1; i <= 5; i++) mc(i)]);
     for (var i = 1; i <= 5; i++) {
-      await tester.tap(find.text('Right $i'));
-      await tester.pump(const Duration(milliseconds: 600));
+      // The popup appears right after the last answer, before Finish.
+      await answer(tester, 'Right $i', thenNext: i < 5);
     }
     expect(storage.secrets, contains(Secrets.perfectPatch));
     expect(find.text('A secret sprouted!'), findsOneWidget);
@@ -51,8 +61,7 @@ void main() {
     final storage = await pumpPatch(tester, [for (var i = 1; i <= 5; i++) mc(i)]);
     final notes = Provider.of<NotesModel>(tester.element(find.byType(StudyMaterialScreen)), listen: false);
     for (var i = 1; i <= 3; i++) {
-      await tester.tap(find.text('Right $i'));
-      await tester.pump(const Duration(milliseconds: 600));
+      await answer(tester, 'Right $i');
     }
     // Leave the Study Patch and open it again.
     await tester.pumpWidget(MultiProvider(
@@ -73,8 +82,7 @@ void main() {
     ));
     await tester.pump();
     for (var i = 4; i <= 5; i++) {
-      await tester.tap(find.text('Right $i'));
-      await tester.pump(const Duration(milliseconds: 600));
+      await answer(tester, 'Right $i');
     }
     expect(storage.secrets, contains(Secrets.perfectPatch));
   });
@@ -83,10 +91,12 @@ void main() {
     final storage = await pumpPatch(tester, [for (var i = 1; i <= 5; i++) mc(i)]);
     await tester.tap(find.text('Wrong 1'));
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Right 1'));
+    await tester.tap(find.text('Right 1')); // too late: the first try counts
+    await tester.pump();
+    await tester.tap(find.text('NEXT'));
+    await tester.pump();
     for (var i = 2; i <= 5; i++) {
-      await tester.tap(find.text('Right $i'));
-      await tester.pump(const Duration(milliseconds: 600));
+      await answer(tester, 'Right $i');
     }
     expect(storage.secrets, isNot(contains(Secrets.perfectPatch)));
   });

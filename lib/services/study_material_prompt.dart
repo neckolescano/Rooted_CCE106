@@ -2,8 +2,20 @@ import '../models/study_options.dart';
 
 /// Builds the prompt that turns a student's notes into study material,
 /// following the choices from the "Grow your study patch" scroll.
-String buildStudyMaterialPrompt(String notes, [StudyOptions options = const StudyOptions()]) {
+///
+/// For a big patch made in batches, [alreadyMade] lists the questions and
+/// flashcard fronts from earlier batches, so this batch asks about other
+/// things instead of repeating them.
+String buildStudyMaterialPrompt(
+  String notes, [
+  StudyOptions options = const StudyOptions(),
+  List<String> alreadyMade = const [],
+]) {
   final parts = <String>[];
+  final avoid = alreadyMade.isEmpty
+      ? ''
+      : 'These were ALREADY made in an earlier batch. Do NOT repeat them or ask about the same facts; '
+          'cover other parts of the notes instead:\n${alreadyMade.map((s) => '- $s').join('\n')}\n\n';
 
   if (options.wantsQuestions) {
     parts.add('- "questions": exactly ${options.questionCount} study questions. ${_styleRule(options.style)}');
@@ -28,13 +40,14 @@ Difficulty: ${_difficultyRule(options.difficulty)}
 Rules:
 - Do not invent facts that are not supported by the notes. If the notes are too short for the requested amount, make fewer items rather than making things up.
 - Do not repeat the same fact in two questions or two flashcards.
+- Spread the items across the WHOLE notes, from the beginning to the end, so every topic gets asked about, not just the first part.
 - Keep every answer, choice and explanation short (one sentence at most).
 - Each question has: "question", "type", "answer", "explanation" (one short sentence based on the notes), and "choices" ONLY for "multiple_choice" and "true_false".
 - For "multiple_choice": 4 choices, and "answer" must be word-for-word identical to one of the choices.
 - For "true_false": "question" is a statement, "choices" is exactly ["True", "False"], and "answer" is "True" or "False".
 - For "identification": the answer is a single term or short phrase from the notes.
 
-Respond with ONLY valid JSON in exactly this shape, with no extra commentary:
+${avoid}Respond with ONLY valid JSON in exactly this shape, with no extra commentary:
 
 {
   "questions": [

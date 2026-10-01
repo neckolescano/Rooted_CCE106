@@ -17,8 +17,13 @@ class StudyOptions {
     this.difficulty = StudyDifficulty.normal,
   });
 
-  /// The counts offered on the scroll.
-  static const counts = [5, 10, 15, 20];
+  /// The counts offered on the scroll. Above [batchSize] the AI makes them
+  /// in batches (see AiService), so 50 questions still works.
+  static const counts = [5, 10, 15, 20, 30, 40, 50];
+
+  /// The most questions (and flashcards) asked for in ONE AI request —
+  /// bigger replies get slow and can be cut off.
+  static const batchSize = 20;
 
   final StudyMake make;
   final int questionCount;
@@ -31,6 +36,10 @@ class StudyOptions {
 
   /// Total items asked for — used to give bigger requests more time.
   int get totalItems => (wantsQuestions ? questionCount : 0) + (wantsFlashcards ? flashcardCount : 0);
+
+  /// Needs more than one AI request (see [batchSize]).
+  bool get isBatched =>
+      (wantsQuestions && questionCount > batchSize) || (wantsFlashcards && flashcardCount > batchSize);
 
   StudyOptions copyWith({
     StudyMake? make,
