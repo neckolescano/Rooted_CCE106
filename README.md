@@ -78,9 +78,12 @@ The mascot is **kuwago**, a pixel owl (*kuwago* is Filipino for "owl").
 
 ## How I built it
 
-kuwaGO was built from **22 September to 2 October 2026**. I designed the app
-and directed the work, and I used an **AI coding assistant (Claude)** as my
-programming partner to turn my designs and ideas into code.
+kuwaGO was built from **22 September to 2 October 2026** using
+**AI-assisted development**. I designed the app in Figma, defined every
+feature, screen and animation, and directed an **AI coding assistant
+(Claude)** to implement them. I reviewed and tested each change on a real
+device, asked for revisions until it matched my design, set up Firebase,
+and ran testing with 14 users.
 
 ### 1. Idea and design
 - I came up with the concept: a Pomodoro timer where studying grows a pixel
@@ -120,7 +123,7 @@ programming partner to turn my designs and ideas into code.
 | Core pixel art (Wild Sunflower, button, harvest scroll) | Drew by hand in Piskel | — |
 | Other plants, wilted versions, backgrounds, app icon | Set the style, approved results | Wrote Dart scripts in `tool/` that generate them in my style |
 | Animations and code-drawn art (owl, skies, confetti, auras) | Described the vision, chose and tested | Wrote the code (`CustomPainter` and animations) |
-| Code | Directed, tested, asked for fixes | Wrote most of it |
+| Code | Defined requirements, reviewed, tested, requested revisions | Generated the implementation from my designs and instructions |
 | Firebase and AI setup | Did the console setup | Gave step-by-step instructions |
 | Testing | Tested on my phone with 14 testers | Wrote the unit tests |
 
