@@ -9,7 +9,7 @@
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "toolArgs": ["--dart-define-from-file=app_check.local.json"]
+      "toolArgs": ["--dart-define-from-file=app_check.local.json", "--dart-define-from-file=groq.local.json"]
     },
     {
       "name": "kuwaGO (profile — smooth animations)",
@@ -17,7 +17,7 @@
       "type": "dart",
       "program": "lib/main.dart",
       "flutterMode": "profile",
-      "toolArgs": ["--dart-define-from-file=app_check.local.json"]
+      "toolArgs": ["--dart-define-from-file=app_check.local.json", "--dart-define-from-file=groq.local.json"]
     }
   ]
 }

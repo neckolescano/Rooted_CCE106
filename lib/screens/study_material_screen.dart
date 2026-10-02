@@ -12,7 +12,7 @@ import '../widgets/flashcard_widget.dart';
 import '../widgets/pixel_icon_button.dart';
 import '../widgets/pixel_panel.dart';
 import '../widgets/secret_found_dialog.dart';
-import '../widgets/study_question_card.dart';
+import '../widgets/study_quiz.dart';
 
 class StudyMaterialScreen extends StatefulWidget {
   const StudyMaterialScreen({super.key});
@@ -39,7 +39,8 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final material = context.watch<NotesModel>().material;
+    final notes = context.watch<NotesModel>();
+    final material = notes.material;
 
     return Scaffold(
       backgroundColor: AppColors.panelMedium,
@@ -83,6 +84,21 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
                             style: AppText.small(),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                if (notes.notice != null) ...[
+                  // e.g. the notes only had enough for 32 of 50 questions.
+                  PixelPanel(
+                    style: PanelStyle.parchment,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.eco, size: 18, color: AppColors.panelMedium),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(child: Text(notes.notice!, style: AppText.small())),
                       ],
                     ),
                   ),
@@ -148,21 +164,10 @@ class _StudyMaterialScreenState extends State<StudyMaterialScreen> {
   Widget _buildQuestions(List<StudyQuestion> questions) {
     if (questions.isEmpty) return _emptyMessage('No questions were generated.');
 
-    final notes = context.read<NotesModel>();
-    return ListView.separated(
-      itemCount: questions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) {
-        return StudyQuestionCard(
-          number: index + 1,
-          total: questions.length,
-          question: questions[index],
-          answered: notes.firstTry.containsKey(index),
-          selectedChoice: notes.chosenAnswers[index],
-          onSelectChoice: (choice) => setState(() => notes.chosenAnswers[index] = choice),
-          onAnswered: (correct) => _recordFirstTry(index, correct, questions.length),
-        );
-      },
+    // One question at a time, with a score at the end (widgets/study_quiz.dart).
+    return StudyQuiz(
+      questions: questions,
+      onFirstTry: (index, correct) => _recordFirstTry(index, correct, questions.length),
     );
   }
 
