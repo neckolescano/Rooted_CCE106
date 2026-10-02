@@ -7,7 +7,7 @@ import 'pixel_button.dart';
 import 'pixel_panel.dart';
 import 'plant_aura.dart';
 
-/// Shown once a plant hits its final growth stage, using your hand-drawn
+/// Shown once a plant hits its final growth stage, using the hand-drawn
 /// scroll (its "CONGRATULATIONS!" banner is baked into the art).
 ///
 /// The celebration happens in layers:

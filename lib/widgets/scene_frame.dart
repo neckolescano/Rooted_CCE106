@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 import 'garden_scene_backdrop.dart';
 import 'pixel_panel.dart';
 
-/// A little framed window into the game world: your meadow art inside a
+/// A little framed window into the game world: the meadow art inside a
 /// wooden picture frame, with anything you like layered on top
 /// ([children] go in a Stack, so use Positioned).
 ///

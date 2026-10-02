@@ -14,7 +14,7 @@ that reads or writes either one.
 
 ## 1. Firestore
 
-### Security rules (published in the console; from FIREBASE_SETUP.md)
+### Security rules (`firestore.rules`)
 
 ```
 rules_version = '2';
@@ -27,7 +27,7 @@ service cloud.firestore {
 }
 ```
 
-The rules file is **not** in the repo; it lives in the Firebase console.
+The rules are in [`firestore.rules`](../firestore.rules) at the project root. Deploy changes with `firebase deploy --only firestore:rules`.
 
 ### `users/{uid}` (one document per user)
 
@@ -36,12 +36,15 @@ The rules file is **not** in the repo; it lives in the Firebase console.
 | `username` | string | sync | Display name. Defaults: Google/email display name, otherwise `Guest Trainee` (guest) or `PlantLover`. Editable, 2–20 characters. |
 | `streak` | int | sync | Completed sessions **in a row**. Reset to 0 on give up. |
 | `totalSessions` | int | sync | All sessions, **completed and abandoned**. |
+| `completedSessions` | int | `increment` | Finished sessions only. Drives XP and plant unlocks. |
 | `harvestedPlants` | int | sync | Number of harvests. |
 | `harvestLog` | string[] | sync | Species id of each harvest, oldest first. May be shorter than `harvestedPlants` for old saves (see §4). |
 | `plantStage` | int | sync | `GrowthStage.index` of the plant in the pot (0 seed … 4 fullGrown). |
 | `plantWilted` | bool | sync | The plant in the pot is wilted. |
 | `plantSpecies` | string | sync | Species id in the pot. Missing → `wild_sunflower`. |
 | `notes` | string | sync | The single Study Journal text. |
+| `studyMaterial` | map | `saveStudyMaterial` | The last generated questions and flashcards, so they are still there next time. |
+| `secrets` | string[] | sync | Hidden achievements found: `perfect_patch`, `deep_focus`. |
 | `email` | string | sync | From the auth account. |
 | `isGuest` | bool | sync | Anonymous account. |
 | `avatar` | string | `setAvatar` only | Base64 JPEG, ≤256×256, quality 75 (about 30 KB). Empty = no photo. Not part of the regular sync. |
@@ -63,7 +66,7 @@ deleted.
 | `seconds` | int | Session length (completed) or time elapsed before giving up |
 | `endedAt` | timestamp | Server time |
 
-The app only writes these. Nothing reads them yet.
+The **Study Log** screen reads the latest 60, newest first (`CloudService.recentSessions`).
 
 ## 2. SharedPreferences keys
 
@@ -163,8 +166,8 @@ Expected AI JSON (built by `study_material_prompt.dart`):
 }
 ```
 
-Generated material is **not stored**; it only lives while the screen is
-open.
+The last generated material is saved locally and in `users/{uid}.studyMaterial`
+(see `StorageService.saveStudyMaterial`).
 
 ### Progress and cosmetics (computed; see [08-business-rules.md](08-business-rules.md))
 - `GardenProgress` (XP, level), `GardenBadge` list, `CardDesign` list plus

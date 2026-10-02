@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'plant_catalog.dart';
 
-/// The 5 growth stages from your Chapter 1 doc.
+/// The 5 growth stages (from the Chapter 1 project proposal).
 /// Order matters here — index 0 is youngest, index 4 is fully grown.
 enum GrowthStage { seed, sprout, grow, bloom, fullGrown }
 

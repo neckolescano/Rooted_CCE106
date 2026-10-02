@@ -13,9 +13,9 @@ import 'plant_display.dart';
 import 'window_zoom.dart';
 
 /// The Home screen's "greenhouse": a cottage wall with a big window
-/// looking out onto your meadow art, and your plant in a wooden planter
+/// looking out onto the meadow art, and the current plant in a wooden planter
 /// on the windowsill. Everything except the meadow and plant is drawn in
-/// code, so it works today with no new art.
+/// code.
 ///
 /// The window has two hinged halves. When Start Study Session is pressed,
 /// [WindowZoom] swings them open and the plant ducks into its planter,

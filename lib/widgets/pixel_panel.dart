@@ -9,7 +9,7 @@ enum PanelStyle { wood, dark, parchment }
 
 /// The 4 colors a pixel frame is drawn with: a dark outline, the fill,
 /// a light top/left edge and a darker bottom/right edge. That lit-edge +
-/// shadow-edge trick is what makes your plaque button and harvest scroll
+/// shadow-edge trick is what makes the plaque button and harvest scroll
 /// look "carved", so every code-drawn panel copies it.
 class PixelFrameColors {
   const PixelFrameColors({
@@ -115,7 +115,7 @@ class PixelPanel extends StatelessWidget {
   }
 }
 
-/// A tiny grey nail head, like the ones on your harvest scroll. Put four
+/// A tiny grey nail head, like the ones on the harvest scroll art. Put four
 /// in the corners of a wooden sign (Stack + Positioned).
 class PixelNail extends StatelessWidget {
   const PixelNail({super.key});

@@ -1,31 +1,28 @@
 # Firebase setup (accounts + database)
 
-Do these in order. Total time: about 15 minutes.
+How the main Firebase project (login + database) was set up. This repo is
+already connected to it; follow these steps only to connect the app to a
+Firebase project of your own. Total time: about 15 minutes.
 
-## 1. Extract this zip over your project — ONE time only
-After step 6 you'll have a real `lib/firebase_options.dart`. Extracting a
-zip over it again would replace it with the placeholder, so don't.
-
-## 2. Add the Firebase packages
-In the project folder terminal:
+## 1. Packages
+Already in `pubspec.yaml`, so just run:
 
 ```
-flutter pub add firebase_core firebase_auth cloud_firestore
 flutter pub get
 ```
 
-## 3. Create the Firebase project
+## 2. Create the Firebase project
 1. Go to https://console.firebase.google.com and sign in with Google.
 2. **Create a project** → name it `rooted` → Google Analytics is optional (off is fine) → **Create**.
 
-## 4. Turn on sign-in methods
+## 3. Turn on sign-in methods
 Left menu → **Build → Authentication → Get started → Sign-in method**.
 Enable all three:
 - **Email/Password**
 - **Anonymous** (this powers "Play as Guest Trainee")
 - **Google** (pick a support email → Save)
 
-## 5. Create the database
+## 4. Create the database
 Left menu → **Build → Firestore Database → Create database**.
 - Location: pick the closest one (for the Philippines, `asia-southeast1` Singapore). This can't be changed later.
 - Choose **Production mode** → **Enable**.
@@ -44,7 +41,7 @@ service cloud.firestore {
 }
 ```
 
-## 6. Connect the app to your Firebase project
+## 5. Connect the app to your Firebase project
 Install the tools once (needs Node.js from https://nodejs.org):
 
 ```
@@ -65,7 +62,7 @@ flutterfire configure
 Pick your `rooted` project and tick **android**. This replaces
 `lib/firebase_options.dart` and adds `android/app/google-services.json`.
 
-## 7. Android minimum version
+## 6. Android minimum version
 Open `android/app/build.gradle.kts` (or `build.gradle`) and set:
 
 ```
@@ -74,7 +71,7 @@ minSdk = 23
 
 (replace `flutter.minSdkVersion` if that's what's there.)
 
-## 8. Run it
+## 7. Run it
 ```
 flutter run
 ```
@@ -83,6 +80,9 @@ console: a `users` collection with your document should appear, and a
 `sessions` subcollection fills in as you finish or give up sessions.
 
 ## What gets stored
+
+The main fields are below. The full, current list is in
+[docs/07-data-model.md](docs/07-data-model.md).
 
 ```
 users/{uid}
@@ -96,7 +96,7 @@ users/{uid}/sessions/{autoId}
 ```
 
 ## Troubleshooting
-- **"Firebase isn't set up yet" screen** → step 6 wasn't done (or failed).
+- **"Firebase isn't set up yet" screen** → step 5 wasn't done (or failed).
 - **Google sign-in fails** → in the Firebase console open Project settings →
   your Android app → **Add fingerprint**. Get it by running
   `cd android` then `.\gradlew signingReport` and copying the debug `SHA1`

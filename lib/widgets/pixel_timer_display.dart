@@ -51,7 +51,7 @@ class PixelTimerDisplay extends StatelessWidget {
               ],
             ),
           ),
-          // Four little nails, like the ones on your harvest scroll.
+          // Four little nails, like the ones on the harvest scroll art.
           const Positioned(left: 7, top: 7, child: PixelNail()),
           const Positioned(right: 7, top: 7, child: PixelNail()),
           const Positioned(left: 7, bottom: 7, child: PixelNail()),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/garden_scenes.dart';
 import 'garden_scene_backdrop.dart';
 
-/// Fills the whole screen with a background image (your pixel-art meadow)
+/// Fills the whole screen with a background image (the pixel-art meadow)
 /// and draws [child] on top of it. If the image file isn't there, it falls
 /// back to a soft green-to-cream gradient that still looks intentional —
 /// so screens don't go back to plain black.
