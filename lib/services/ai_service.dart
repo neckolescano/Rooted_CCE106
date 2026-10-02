@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../models/study_material.dart';
 import '../models/study_options.dart';
 import 'ai_firebase.dart';
+import 'groq_service.dart';
 import 'offline_study_maker.dart';
 import 'study_material_prompt.dart';
 
@@ -156,18 +157,17 @@ class AiService {
   /// One batch: asks Gemini, retrying / switching model while it's busy,
   /// within a time budget. null = no model answered in time.
   Future<StudyMaterial?> _askWithRetries(String prompt, StudyOptions options) async {
+    if (_tryGroqFirst) {
+      final fromGroq = await _askGroq(prompt, options);
+      if (fromGroq != null) return fromGroq;
+    }
     final clock = Stopwatch()..start();
     for (final modelName in _models) {
       for (var attempt = 1; attempt <= _triesPerModel; attempt++) {
         if (clock.elapsed > _totalBudget(options)) break;
         try {
           final text = await _ask(modelName, prompt, options);
-          final m = _parse(text);
-          // Drop what wasn't asked for (the AI sometimes adds extras).
-          return StudyMaterial(
-            questions: options.wantsQuestions ? m.questions : const [],
-            flashcards: options.wantsFlashcards ? m.flashcards : const [],
-          );
+          return _keepAsked(_parse(text), options);
         } on AiServiceException {
           rethrow; // e.g. empty/garbled reply — not worth retrying
         } on TimeoutException {
@@ -184,9 +184,34 @@ class AiService {
         }
       }
     }
-    debugPrint('[AI] no model answered in time (${clock.elapsed.inSeconds}s)');
+    debugPrint('[AI] no Gemini model answered in time (${clock.elapsed.inSeconds}s)');
+    // Backup AI (not Firebase): Groq. Skipped if it already went first.
+    if (!_tryGroqFirst) return _askGroq(prompt, options);
     return null;
   }
+
+  /// Testing / demo switch: true = ask Groq BEFORE Gemini, so you can see
+  /// the backup AI working. Keep false normally (Gemini first).
+  static const _tryGroqFirst = false;
+
+  /// One batch from the backup AI (Groq). null = no key, or it couldn't
+  /// answer → the caller moves on (to Gemini, or the offline maker).
+  Future<StudyMaterial?> _askGroq(String prompt, StudyOptions options) async {
+    final text = await GroqService.ask(prompt, maxTokens: _maxOutputTokens(options), timeout: _requestTimeout(options));
+    if (text == null) return null;
+    try {
+      return _keepAsked(_parse(text), options);
+    } on AiServiceException catch (error) {
+      debugPrint('[AI] Groq reply was unusable: $error');
+      return null;
+    }
+  }
+
+  /// Drops what wasn't asked for (the AI sometimes adds extras).
+  StudyMaterial _keepAsked(StudyMaterial m, StudyOptions options) => StudyMaterial(
+        questions: options.wantsQuestions ? m.questions : const [],
+        flashcards: options.wantsFlashcards ? m.flashcards : const [],
+      );
 
   /// The batches a patch needs, plus one spare to replace repeats (so a
   /// repeating AI can't use up the daily quota).

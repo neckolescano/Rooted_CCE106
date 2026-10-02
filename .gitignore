@@ -49,3 +49,4 @@ app.*.map.json
 
 # App Check debug token for this developer's phone (secret; see AI_SETUP.md)
 app_check.local.json
+groq.local.json
